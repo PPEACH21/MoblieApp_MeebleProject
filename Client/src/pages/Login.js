@@ -1,9 +1,10 @@
 import {View,Text} from "react-native" 
+import {m} from "../../paraglide/messages.js"
 
 const Login=()=>{
     return(
         <View>
-            <Text>Hello</Text>
+            {/* <Text>{m.HELLO()}</Text> */}
         </View>
 
     )
