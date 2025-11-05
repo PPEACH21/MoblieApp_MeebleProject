@@ -4,6 +4,7 @@ import { Button } from 'react-native';
 import {m} from './src/paraglide/messages.js'
 import { getLocale, setLocale } from './src/paraglide/runtime.js';
 import { useState } from 'react';
+import Login from './src/pages/Login.js';
 
 export default function App() {
 
@@ -19,6 +20,7 @@ export default function App() {
       <Text>Open up App.js to start working on your app!</Text>
       <Text>{m.login()}</Text>
       <Button title="CHANGE LANGUAGE" onPress={toggleLanguage} />
+
       <StatusBar style="auto" />
     </View>
   );
