@@ -1,5 +1,6 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
+  "HELLO": "Hello world",
   "example_message": "Hello world {username}",
   "projectname": "Meeble",
   "register": "Register",
