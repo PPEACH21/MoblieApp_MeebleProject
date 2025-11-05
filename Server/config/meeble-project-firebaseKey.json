@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "meeble-moblie-project",
+  "private_key_id": "ae794a17c52a6b161893ea83a6d8b04ac743e746",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDX7l+BMLhBRSeu\ng8zoAi7AbW9Lz1igXt6vFJWXlL1Ob/DXLODQ+OfzntgnDsI77u4jTI98oJPLiKWz\nKhNB82iiAAxZJlSIChuFquShi4RASJMxI4azAlwmmo3nHjYWjdJY75EdES433tPQ\neCSQFWSTiS+lCf0d+y+mjbxo0766mUQyfDOpIrQAYMwr8tgTf+06kyK/67X3N4VY\nY83MT0pMsLxVcKuqfMHNZ75PnfZ0sRhxm2NK//p+6NemfyTW1H4jqowAL5yITYsU\nXNdUPqQBxF7dS6JvZt/dmfuk2Vq5UJDH1fln4N7t0cqD7pjUDijhLn740Fs2kxDc\nawbAoADjAgMBAAECggEACeebGuPKDThnsGdxo+d3DzLrNYOD0bYNqeNG/1vTw9V6\nVdcZqDbv+3/680Oyi37ouSwfCCecz+vAigjb4Z0Rh3N6yDDBajdoeXJUKB2BtKnU\n5/P0uaEElW1mepurUyUwk7gdecNa0YuXlLWbcRPXeAsFaUvIKrK7G1KKD2w9u0ph\n4KYnT1zOjATG+/irFD1cnxsB85gBqy3dL8zg+q5I3sUBlGUVWJXU4l44JCQvE3iz\n8j9w1ZUL5/80+Q5zKUT4VD7yvBsdkxSRjO4wu/79O4aPoMuRultkInsVfSbzVTC/\nHbyBNt8izQht6ZMOgPn2dIwTcHkl5bNlmzPoF1OF7QKBgQD6yHC8zs5ceDyoNBoO\nRoTefKtebY4A+dfEN1kFV63jTi1lszEgf5bK+Jeixx6C/RbrN+TVeqdbnaaO3fgf\nyXQc6buwPqjBoz7Qszif0guFk+GqUNNZox31pr30fBAj/X7rl8Djpms7OpLF+etB\njf8DI08XsgSuV7eOqwIBFJc4zwKBgQDcbFPEY1p3gmhv7B/kIvs9XmdM/f3wNzjc\n2Sm22eO8fQ35iStedZTIVQKI38WIMKRCvw1dp6aR4BmCoD1sqDJ/3WnQfwuLcIjc\nvax/pnGiS6tlZGLWMgZOwSqTKvZyxb9PZG4i6LOtQH1t4SzZUl4NafmTmOUbJjHu\nqXfX0qTTrQKBgQCU4YgkXvYd6XfBN+U8EltxJjwqfAmwxKJ2p5Ee3dWqu0+yL7Z7\nn6Nq7jg/d8zCYPRJQk6E+iL+/dHSwS472MIpJA277QcMphh1l+CG6RDUBV4UWZWP\ngooXuxzMVxbR9v1xag8mVzcT24slI2Cp812whDbBT3r98a9UcGtpLssz+wKBgBD+\ntTK2Klp+jojantbbL53asoJILxUfXN4CTGoRwLJevf4YamSdEjyj+U8OWc+XWILg\n8infbENhEPZ2XmYLTeF389mkggJdSeAjK7Kn5akKxotJwykasEvQLvUr4daVkpuP\ndcJxSLE6ALHBI9EZvbCxFBIiPr/qIP1yyY+1aQn9AoGBAKwMJO+lfGOizjE2wXKE\nyQOQTs8E709cO1C8Rotic9+wjkHVp0uvguGiNXYpQrawnGsen3F+S/XBsDZF0qU+\n1k9vlZoQmsZse1K3d3P9kFFiAHannyn08hiti6afx9vb/G9UMqqWYd2MGaz2kbBv\nf490e+r3OYBCdOmZZFENTFuG\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@meeble-moblie-project.iam.gserviceaccount.com",
+  "client_id": "107788243434426943977",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40meeble-moblie-project.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
