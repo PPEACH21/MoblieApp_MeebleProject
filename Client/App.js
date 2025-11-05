@@ -1,10 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from 'react-native';
-import { getLocale,setLocale } from './paraglide/runtime.js';
 import { m } from './paraglide/messages.js';
+import { getLocale,setLocale } from './paraglide/runtime.js';
 import { useState } from 'react';
-import Login from './src/pages/Login.js';
+import { NavigationContainer } from '@react-navigation/native';
+import StackNav from './src/StackNav.js';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import U_Home from './src/User/pages/U_Home.js';
 
 export default function App() {
 
@@ -16,21 +19,14 @@ export default function App() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
+    <SafeAreaView style={{flex:1}}>
+      {/* <Text>Open up App.js to start working on your app!</Text>
       <Text>{m.HELLO()}</Text>
-      <Button title="CHANGE LANGUAGE" onPress={toggleLanguage} />
-
-      <StatusBar style="auto" />
-    </View>
+      <Button title="CHANGE LANGUAGE" onPress={toggleLanguage} /> */}
+      {/* <StatusBar style="auto" /> */}
+      <NavigationContainer>
+        <StackNav/>
+      </NavigationContainer>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
