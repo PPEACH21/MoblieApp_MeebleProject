@@ -1,0 +1,56 @@
+import { StyleSheet, Platform } from "react-native";
+
+export const styles = StyleSheet.create({
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  container: { flex: 1, padding: 16, backgroundColor: "#f8fafc" },
+  noImage: {
+    width: "100%",
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: { fontSize: 22, fontWeight: "700", marginBottom: 12 },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    elevation: 2,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eef2f7",
+    justifyContent: "space-between",
+  },
+  left: { flexDirection: "row", alignItems: "center" },
+  right: { flexDirection: "row", alignItems: "center" },
+  label: { fontSize: 16, color: "#374151" },
+  value: { fontSize: 16, fontWeight: "600" },
+  badge: {
+    marginLeft: 10,
+    color: "#fff",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    fontSize: 12,
+  },
+  error: { color: "#dc2626", marginTop: 4, textAlign: "center" },
+  retryBtn: {
+    marginTop: 10,
+    backgroundColor: "#111827",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  retryText: { color: "#fff", fontWeight: "600" },
+});
