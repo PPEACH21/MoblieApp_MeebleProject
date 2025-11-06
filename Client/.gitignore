@@ -3,7 +3,7 @@
 # dependencies
 node_modules/
 Client/package_lock.json
-
+Server/config/meeble-project-firebaseKey.json
 # Expo
 .expo/
 dist/
