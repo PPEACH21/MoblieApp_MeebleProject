@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import U_Home from './pages/U_Home';
 
 
-const ButtonNav =()=> {
+const U_ButtonNav =()=> {
   const Tab = createBottomTabNavigator();
   return (
     <Tab.Navigator>
@@ -11,4 +11,4 @@ const ButtonNav =()=> {
   );
 }
 
-export default ButtonNav;
+export default U_ButtonNav;

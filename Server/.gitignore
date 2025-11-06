@@ -1,2 +1,6 @@
 .env
 meeble-project-firebaseKey.json
+.env*.local
+
+/config/.env
+/config/meeble-project-firebaseKey.json
