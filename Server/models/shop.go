@@ -10,9 +10,7 @@ var AllowedTypes = map[string]bool{
 	"Dessert":    true,
 }
 
-func IsAllowedType(t string) bool {
-	return AllowedTypes[t]
-}
+func IsAllowedType(t string) bool { return AllowedTypes[t] }
 
 type GeoPoint struct {
 	Latitude  float64 `json:"latitude" firestore:"latitude"`
@@ -20,13 +18,17 @@ type GeoPoint struct {
 }
 
 type Shop struct {
-	ID            string    `json:"id,omitempty" firestore:"-"`
-	ShopName      string    `json:"shop_name" firestore:"shop_name"`
-	Description   string    `json:"description,omitempty" firestore:"description,omitempty"`
-	Type          string    `json:"type" firestore:"type"`
-	Image         string    `json:"image,omitempty" firestore:"image,omitempty"`
-	PriceMin      float64   `json:"price_min" firestore:"price_min"`
-	PriceMax      float64   `json:"price_max" firestore:"price_max"`
+	ID          string `json:"id,omitempty" firestore:"-"`
+	ShopName    string `json:"shop_name" firestore:"shop_name"`
+	Description string `json:"description,omitempty" firestore:"description,omitempty"`
+	Type        string `json:"type" firestore:"type"`
+	Image       string `json:"image,omitempty" firestore:"image,omitempty"`
+
+	// ✅ pointer รองรับ null
+	PriceMin      *float64 `json:"price_min,omitempty" firestore:"price_min,omitempty"`
+	PriceMax      *float64 `json:"price_max,omitempty" firestore:"price_max,omitempty"`
+	MenuActiveCnt *int     `json:"menu_active_count,omitempty" firestore:"menu_active_count,omitempty"`
+
 	Address       *GeoPoint `json:"address,omitempty" firestore:"address,omitempty"`
 	VendorID      string    `json:"vendor_id,omitempty" firestore:"vendor_id,omitempty"`
 	OrderActive   bool      `json:"order_active" firestore:"order_active"`
@@ -35,6 +37,7 @@ type Shop struct {
 	CreatedAt     time.Time `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt" firestore:"updatedAt"`
 }
+
 type UpdateShopBody struct {
 	ShopName      *string   `json:"shop_name"`
 	Description   *string   `json:"description"`
@@ -44,9 +47,7 @@ type UpdateShopBody struct {
 	OrderActive   *bool     `json:"order_active"`
 	ReserveActive *bool     `json:"reserve_active"`
 	Address       *GeoPoint `json:"address"`
-
-	// สำหรับรองรับโครงสร้างเก่า (ไม่ใช้)
-	Location any `json:"location"`
+	Location      any       `json:"location"` // legacy
 }
 
 const (
@@ -71,9 +72,10 @@ type CreateMenuReq struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Image       string   `json:"image"`
-	Price       *float64 `json:"price"`  // ใช้ pointer เพื่อตรวจสอบว่า user ส่งมาไหม
-	Active      *bool    `json:"active"` // optional: default true
+	Price       *float64 `json:"price"`
+	Active      *bool    `json:"active"`
 }
+
 type UpdateMenuReq struct {
 	Name        *string  `json:"name,omitempty"`
 	Description *string  `json:"description,omitempty"`

@@ -10,4 +10,5 @@ export const BaseColor ={
     fullwhite:"#fff",
     green:"#2b7424",
     blue:"#2a2aa8ff",
+    red:"rgba(221, 51, 51, 1)",
 }
