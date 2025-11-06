@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { api } from "../axios";
+import { BaseColor as c } from "../components/Color";
 
 /* ---------- config ---------- */
 const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
@@ -39,8 +40,6 @@ const toDate = (v) => {
   if (typeof v === "object" && ("seconds" in v || "_seconds" in v)) {
     const s = v.seconds ?? v._seconds;
     return new Date(s * 1000);
-    // ถ้าเป็น Firestore Timestamp ที่เป็น toDate():
-    // if (typeof v.toDate === "function") return v.toDate();
   }
   const d = new Date(v);
   return isNaN(+d) ? null : d;
@@ -76,9 +75,8 @@ const normalizeReservations = (data) => {
     return {
       id,
       startAt: start,
-      people: Number(
-        r.people ?? r.party_size ?? r.guests ?? r.qty ?? r.count ?? r.pax ?? 1
-      ) || 1,
+      people:
+        Number(r.people ?? r.party_size ?? r.guests ?? r.qty ?? r.count ?? r.pax ?? 1) || 1,
       user_id: r.user_id || r.userId || r.customer_id || "-",
       phone: r.phone || r.customerPhone || r.customer_phone || "",
       note: r.note || r.notes || r.remark || "",
@@ -101,7 +99,6 @@ export default function ReserveShop() {
       setErr(null);
       setLoading(true);
 
-      // เส้นทางหลัก
       let res;
       try {
         res = await api.get(`/shops/${SHOP_ID}/reservations`, {
@@ -110,14 +107,12 @@ export default function ReserveShop() {
         });
       } catch (e1) {
         if (e1?.response?.status === 404) {
-          // ไม่มีรายการ -> เคลียร์รายการแล้วจบแบบไม่เป็น error
           setResv([]);
           setErr(null);
           setLoading(false);
           setRefreshing(false);
           return;
         }
-        // สำรอง (ถ้าระบบคุณยังใช้ /shop/)
         try {
           res = await api.get(`/shop/${SHOP_ID}/reservations`, {
             withCredentials: true,
@@ -137,7 +132,7 @@ export default function ReserveShop() {
 
       const list = normalizeReservations(res?.data);
 
-      // กรองตามแท็บ (เวลา)
+      // กรองตามแท็บเวลา
       const now = new Date();
       const todayList = [];
       const upcomingList = [];
@@ -156,7 +151,6 @@ export default function ReserveShop() {
       else if (filter === "upcoming") finalList = upcomingList;
       else if (filter === "past") finalList = pastList;
 
-      // เรียงเวลาน้อย -> มาก
       finalList.sort((a, b) => {
         const da = +toDate(a.startAt) || 0;
         const db = +toDate(b.startAt) || 0;
@@ -204,13 +198,15 @@ export default function ReserveShop() {
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 999,
-              backgroundColor: active ? "#111827" : "#e5e7eb",
+              backgroundColor: active ? c.S2 : c.S3,
+              borderWidth: active ? 0 : 1,
+              borderColor: c.S3,
             }}
           >
             <Text
               style={{
-                color: active ? "#fff" : "#111827",
-                fontWeight: "700",
+                color: active ? c.fullwhite : c.black,
+                fontWeight: "800",
                 fontSize: 12,
               }}
             >
@@ -225,44 +221,46 @@ export default function ReserveShop() {
   const renderItem = ({ item: r }) => (
     <View
       style={{
-        backgroundColor: "#fff",
+        backgroundColor: c.fullwhite,
         padding: 14,
         borderRadius: 14,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: "#e5e7eb",
+        borderColor: c.S3, // เส้นขอบส้มอ่อน
       }}
     >
       {/* header */}
-      <Text style={{ fontSize: 16, fontWeight: "800", color: "#111827" }}>
+      <Text style={{ fontSize: 16, fontWeight: "900", color: c.black }}>
         การจอง #{r.id?.slice(-6) || "-"}
       </Text>
 
       {/* meta */}
-      <Text style={{ marginTop: 6, color: "#6b7280" }}>
+      <Text style={{ marginTop: 6, color: c.black, opacity: 0.7 }}>
         ผู้จอง:{" "}
-        <Text style={{ color: "#111827", fontWeight: "600" }}>
+        <Text style={{ color: c.black, fontWeight: "700" }}>
           {r.user_id || "-"}
         </Text>
       </Text>
 
-      <Text style={{ marginTop: 2, color: "#6b7280" }}>
+      <Text style={{ marginTop: 2, color: c.black, opacity: 0.7 }}>
         เวลา:{" "}
-        <Text style={{ color: "#111827", fontWeight: "600" }}>
+        <Text style={{ color: c.black, fontWeight: "700" }}>
           {fmtDateTime(r.startAt)}
         </Text>
       </Text>
 
-      <Text style={{ marginTop: 2, color: "#6b7280" }}>
+      <Text style={{ marginTop: 2, color: c.black, opacity: 0.7 }}>
         จำนวนคน:{" "}
-        <Text style={{ color: "#111827", fontWeight: "700" }}>{r.people}</Text>
+        <Text style={{ color: c.black, fontWeight: "900" }}>{r.people}</Text>
       </Text>
 
       {!!r.phone && (
-        <Text style={{ marginTop: 2, color: "#6b7280" }}>โทร: {r.phone}</Text>
+        <Text style={{ marginTop: 2, color: c.black, opacity: 0.7 }}>
+          โทร: {r.phone}
+        </Text>
       )}
       {!!r.note && (
-        <Text style={{ marginTop: 6, color: "#374151" }}>หมายเหตุ: {r.note}</Text>
+        <Text style={{ marginTop: 6, color: c.black }}>หมายเหตุ: {r.note}</Text>
       )}
     </View>
   );
@@ -275,14 +273,14 @@ export default function ReserveShop() {
 
   /* ---------- render ---------- */
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.fullwhite }} edges={["top"]}>
       <StatusBar style="dark" />
       {/* header */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 20, fontWeight: "900", color: "#111827" }}>
+        <Text style={{ fontSize: 20, fontWeight: "900", color: c.black }}>
           รายการจองเข้าร้าน
         </Text>
-        <Text style={{ color: "#6b7280", marginTop: 2 }}>
+        <Text style={{ color: c.black, opacity: 0.7, marginTop: 2 }}>
           {filter === "all"
             ? "ทั้งหมด"
             : filter === "today"
@@ -299,8 +297,8 @@ export default function ReserveShop() {
 
       {loading ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 8, color: "#6b7280" }}>
+          <ActivityIndicator size="large" color={c.S2} />
+          <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
             กำลังโหลดรายการจอง…
           </Text>
         </View>
@@ -313,21 +311,21 @@ export default function ReserveShop() {
             paddingHorizontal: 24,
           }}
         >
-          {!!err.status && <Text style={{ color: "#ef4444" }}>HTTP {err.status}</Text>}
-          <Text style={{ color: "#ef4444", marginTop: 4, textAlign: "center" }}>
+          {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
+          <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>
             {err.message}
           </Text>
           <Pressable
             onPress={fetchReservations}
             style={{
               marginTop: 12,
-              backgroundColor: "#111827",
+              backgroundColor: c.S2,
               paddingHorizontal: 14,
               paddingVertical: 8,
               borderRadius: 10,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>ลองใหม่</Text>
+            <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
           </Pressable>
         </View>
       ) : (
@@ -341,11 +339,11 @@ export default function ReserveShop() {
             paddingBottom: 20,
           }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />
           }
           ListEmptyComponent={() => (
             <View style={{ alignItems: "center", marginTop: 24 }}>
-              <Text style={{ color: "#6b7280" }}>ยังไม่มีการจองขณะนี้</Text>
+              <Text style={{ color: c.black, opacity: 0.7 }}>ยังไม่มีการจองขณะนี้</Text>
             </View>
           )}
         />

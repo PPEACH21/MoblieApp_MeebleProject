@@ -1,56 +1,240 @@
+
 import { StyleSheet, Platform } from "react-native";
 
+const radius = 14;
+
 export const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
+  /* ---------- layout ---------- */
+  container: {
+    padding: 20,
+    paddingBottom: 28,
+    gap: 14,
   },
-  container: { flex: 1, padding: 16, backgroundColor: "#f8fafc" },
-  noImage: {
-    width: "100%",
-    backgroundColor: "#f3f4f6",
-    alignItems: "center",
-    justifyContent: "center",
+
+  /* ---------- headings ---------- */
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 6,
   },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 12 },
+  subtitle: {
+    fontSize: 14,
+    color: "#6b7280",
+    marginBottom: 12,
+  },
+
+  /* ---------- card ---------- */
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: radius,
+    padding: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+      },
+      android: { elevation: 2 },
+      default: {},
+    }),
+  },
+
+  /* ---------- form ---------- */
+  label: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  input: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    elevation: 2,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: "#111827",
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
+  textarea: {
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+
+  /* ---------- select (modal dropdown) ---------- */
+  selectInput: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eef2f7",
+    justifyContent: "center",
+  },
+  selectText: {
+    fontSize: 15,
+    color: "#111827",
+  },
+  selectPlaceholder: {
+    fontSize: 15,
+    color: "#9ca3af",
+  },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    maxHeight: "70%",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 10,
+  },
+  optionRow: {
+    paddingVertical: 12,
+    flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
   },
-  left: { flexDirection: "row", alignItems: "center" },
-  right: { flexDirection: "row", alignItems: "center" },
-  label: { fontSize: 16, color: "#374151" },
-  value: { fontSize: 16, fontWeight: "600" },
-  badge: {
-    marginLeft: 10,
-    color: "#fff",
-    overflow: "hidden",
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 999,
-    fontSize: 12,
+  optionText: {
+    fontSize: 15,
+    color: "#111827",
+    flex: 1,
+    paddingRight: 8,
   },
-  error: { color: "#dc2626", marginTop: 4, textAlign: "center" },
-  retryBtn: {
-    marginTop: 10,
-    backgroundColor: "#111827",
+  optionTick: {
+    fontSize: 16,
+    color: "#10b981",
+    marginLeft: 8,
+  },
+
+  /* ---------- image ---------- */
+  preview: {
+    width: "100%",
+    height: 180,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  previewPlaceholder: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f9fafb",
+  },
+  muted: {
+    color: "#9ca3af",
+    fontSize: 13,
+  },
+
+  /* ---------- buttons ---------- */
+  button: {
+    borderRadius: 12,
+    paddingVertical: 12,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#111827",
   },
-  retryText: { color: "#fff", fontWeight: "600" },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  primary: {
+    backgroundColor: "#2563eb",
+  },
+  ghost: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  ghostText: {
+    color: "#111827",
+  },
+
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+
+  /* ---------- map ---------- */
+  map: {
+    width: "100%",
+    height: 220,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  coordsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  coords: {
+    fontSize: 12,
+    color: "#6b7280",
+  },
+
+  /* ---------- search ---------- */
+  searchWrap: {
+    position: "relative",
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: "#111827",
+  },
+  searchDropdown: {
+    position: "absolute",
+    top: 48,
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+      },
+      android: { elevation: 3 },
+      default: {},
+    }),
+    maxHeight: 220,
+    zIndex: 50,
+  },
+  searchItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  searchText: {
+    fontSize: 14,
+    color: "#111827",
+  },
+  searchSep: {
+    height: 1,
+    backgroundColor: "#f3f4f6",
+    marginHorizontal: 12,
+  },
 });

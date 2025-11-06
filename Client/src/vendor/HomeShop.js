@@ -1,3 +1,4 @@
+// src/Vendor/HomeShop.jsx (เวอร์ชันใช้ BaseColor เต็มรูปแบบ)
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -8,7 +9,7 @@ import {
   Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BaseColor as c}  from "../components/Color";
+import { BaseColor as c } from "../components/Color";
 import { api } from "../axios";
 
 const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
@@ -43,56 +44,93 @@ const normalizeShop = (s) =>
       }
     : s;
 
-/* พยายามรองรับหลายรูปแบบสถิติจาก backend ต่างกัน */
-const mapStats = (raw) => {
-  if (!raw) return null;
-  const todaySales =
-    raw.todaySales ?? raw.sales_today ?? raw?.sales?.today ?? raw?.today?.sales ?? 0;
-  const orderCount =
-    raw.todayOrders ?? raw.orders_today ?? raw?.orders?.today ?? raw?.today?.orders ?? 0;
-  const reserveCount =
-    raw.todayReserves ?? raw.reserves_today ?? raw?.reserves?.today ?? raw?.today?.reserves ?? 0;
-  const totalSales =
-    raw.totalSales ?? raw.sales_total ?? raw?.sales?.total ?? raw?.total?.sales ?? 0;
-  return {
-    todaySales: toNum(todaySales),
-    orderCount: toNum(orderCount),
-    reserveCount: toNum(reserveCount),
-    totalSales: toNum(totalSales),
-  };
+/* เวลา/วันท้องถิ่น */
+const toDate = (v) => {
+  if (!v) return null;
+  if (typeof v === "object") {
+    if ("seconds" in v) return new Date(v.seconds * 1000);
+    if ("_seconds" in v) return new Date(v._seconds * 1000);
+  }
+  const d = new Date(v);
+  return isNaN(+d) ? null : d;
+};
+const isSameDayLocal = (a, b = new Date()) => {
+  if (!a) return false;
+  const d1 = a, d2 = b;
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
 };
 
+/* แปลง orders/reservations ให้เป็นรูปแบบที่อ่านง่าย */
+const normalizeOrders = (arr = []) =>
+  arr.map((o) => ({
+    id: o.id || o.orderId || Math.random().toString(36).slice(2),
+    customer: o.customerName || o.customer || "ลูกค้า",
+    status: (o.status || "").toString().toLowerCase(),
+    createdAt:
+      toDate(o.createdAt) ||
+      toDate(o.createAt) ||
+      toDate(o.created_at) ||
+      toDate(o.time) ||
+      null,
+    total: toNum(o.total ?? o.amount ?? o.price ?? 0),
+  }));
+
+const normalizeReserves = (arr = []) =>
+  arr.map((r) => ({
+    id: r.id || r.reserveId || Math.random().toString(36).slice(2),
+    name: r.name || r.customerName || "ลูกค้า",
+    people: toNum(r.people || r.seats || 0),
+    startAt: toDate(r.startAt) || toDate(r.time) || toDate(r.createdAt) || null,
+  }));
+
+/* นับเฉพาะสถานะที่ถือว่า “สำเร็จ/ชำระแล้ว” */
+const PAID_STATUSES = new Set([
+  "paid",
+  "success",
+  "completed",
+  "complete",
+  "done",
+  "delivered",
+  "finished",
+]);
+
+/* รวมยอดขาย */
+const sumSales = (orders = [], { onlyPaid = true, onlyToday = false } = {}) =>
+  orders.reduce((acc, o) => {
+    if (onlyPaid && !PAID_STATUSES.has(o.status)) return acc;
+    if (onlyToday && !isSameDayLocal(o.createdAt)) return acc;
+    return acc + toNum(o.total);
+  }, 0);
+
+/* เลือกเฉพาะ orders วันนี้ */
+const filterToday = (orders = []) => orders.filter((o) => isSameDayLocal(o.createdAt));
+
+/* ---------- component ---------- */
 export default function HomeShop() {
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  // สถิติ 4 ช่อง
+  // KPI (คำนวณเองใน FE)
   const [stats, setStats] = useState({
     todaySales: 0,
     orderCount: 0,
     reserveCount: 0,
     totalSales: 0,
   });
-  const [statsLoading, setStatsLoading] = useState(true);
 
-  // ออเดอร์ล่าสุด & การจองวันนี้
-  const [orders, setOrders] = useState([]);
+  // รายการแสดงผล
+  const [ordersRecent, setOrdersRecent] = useState([]);
+  const [ordersToday, setOrdersToday] = useState([]);
+  const [ordersAll, setOrdersAll] = useState([]); // ใช้คำนวณ totalSales
+  const [reservesToday, setReservesToday] = useState([]);
+
   const [ordersLoading, setOrdersLoading] = useState(true);
-
-  const [reserves, setReserves] = useState([]);
   const [reservesLoading, setReservesLoading] = useState(true);
-
-  // สรุปสัปดาห์ (mock ถ้ายังไม่มี endpoint)
-  const [weekSummary, setWeekSummary] = useState([
-    { day: "จ.", sales: 1200, orders: 6 },
-    { day: "อ.", sales: 980, orders: 4 },
-    { day: "พ.", sales: 1430, orders: 7 },
-    { day: "พฤ.", sales: 1100, orders: 5 },
-    { day: "ศ.", sales: 1670, orders: 8 },
-    { day: "ส.", sales: 950, orders: 4 },
-    { day: "อา.", sales: 730, orders: 3 },
-  ]);
 
   const tryGet = async (url) => {
     try {
@@ -112,68 +150,72 @@ export default function HomeShop() {
       if (!shopData) throw new Error("ยังไม่มีร้าน โปรดสร้างร้านก่อน");
       setShop(normalizeShop(shopData));
     } catch (e) {
-      const er = toErr(e, "โหลดข้อมูลร้านไม่สำเร็จ");
-      setErr(er);
+      setErr(toErr(e, "โหลดข้อมูลร้านไม่สำเร็จ"));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
-    const candidates = [
-      `/shop/${SHOP_ID}/stats/summary`,
-      `/shop/${SHOP_ID}/stats`,
-      `/shops/${SHOP_ID}/stats`,
-      `/stats?shopId=${SHOP_ID}`,
-    ];
-    let raw = null;
-    for (const u of candidates) {
-      // eslint-disable-next-line no-await-in-loop
-      const got = await tryGet(u);
-      if (got) {
-        raw = got?.data || got?.stats || got;
-        break;
-      }
-    }
-    const mapped =
-      mapStats(raw) || { todaySales: 0, orderCount: 0, reserveCount: 0, totalSales: 0 };
-    setStats(mapped);
-    setStatsLoading(false);
-  }, []);
-
-  const fetchRecentOrders = useCallback(async () => {
+  /* ดึง orders (recent, today, all) เพื่อใช้คำนวณ KPI เอง */
+  const fetchOrdersForKPI = useCallback(async () => {
     setOrdersLoading(true);
-    const candidates = [
+
+    // recent 8 (เพื่อโชว์การ์ดรายการ)
+    const candRecent = [
       `/shop/${SHOP_ID}/orders/recent?limit=8`,
       `/orders/recent?shopId=${SHOP_ID}&limit=8`,
       `/shops/${SHOP_ID}/orders?recent=true&limit=8`,
     ];
-    let list = null;
-    for (const u of candidates) {
-      // eslint-disable-next-line no-await-in-loop
+    let recent = null;
+    for (const u of candRecent) {
       const got = await tryGet(u);
       if (got?.orders || Array.isArray(got)) {
-        list = got.orders || got;
+        recent = normalizeOrders(got.orders || got);
         break;
       }
     }
-    setOrders(
-      (list || []).map((o) => ({
-        id: o.id || o.orderId || Math.random().toString(36).slice(2),
-        customer: o.customerName || o.customer || "ลูกค้า",
-        status: o.status || "รอดำเนินการ",
-        time:
-          o.createdAt
-            ? new Date(o.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
-            : "--:--",
-        total: toNum(o.total || o.amount || 0),
-      }))
-    );
+    setOrdersRecent(recent || []);
+
+    // today
+    const candToday = [
+      `/shop/${SHOP_ID}/orders?range=today`,
+      `/orders?shopId=${SHOP_ID}&range=today`,
+      `/shops/${SHOP_ID}/orders?date=today`,
+    ];
+    let todayList = null;
+    for (const u of candToday) {
+      const got = await tryGet(u);
+      if (got?.orders || Array.isArray(got)) {
+        todayList = normalizeOrders(got.orders || got);
+        break;
+      }
+    }
+    if (!todayList && recent) {
+      todayList = filterToday(recent);
+    }
+    setOrdersToday(todayList || []);
+
+    // all
+    const candAll = [
+      `/shop/${SHOP_ID}/orders?range=all`,
+      `/orders?shopId=${SHOP_ID}`,
+      `/shops/${SHOP_ID}/orders`,
+    ];
+    let allList = null;
+    for (const u of candAll) {
+      const got = await tryGet(u);
+      if (got?.orders || Array.isArray(got)) {
+        allList = normalizeOrders(got.orders || got);
+        break;
+      }
+    }
+    setOrdersAll(allList || todayList || []);
+
     setOrdersLoading(false);
   }, []);
 
-  const fetchTodayReserves = useCallback(async () => {
+  /* ดึง reservations (today) */
+  const fetchReservesToday = useCallback(async () => {
     setReservesLoading(true);
     const candidates = [
       `/shop/${SHOP_ID}/reservations/today`,
@@ -182,43 +224,43 @@ export default function HomeShop() {
     ];
     let list = null;
     for (const u of candidates) {
-      // eslint-disable-next-line no-await-in-loop
       const got = await tryGet(u);
       if (got?.reservations || Array.isArray(got)) {
-        list = got.reservations || got;
+        list = normalizeReserves(got.reservations || got);
         break;
       }
     }
-    setReserves(
-      (list || []).map((r) => ({
-        id: r.id || r.reserveId || Math.random().toString(36).slice(2),
-        name: r.name || r.customerName || "ลูกค้า",
-        people: toNum(r.people || r.seats || 0),
-        time:
-          r.time || (r.startAt
-            ? new Date(r.startAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
-            : "--:--"),
-      }))
-    );
+    setReservesToday(list || []);
     setReservesLoading(false);
   }, []);
 
+  /* คำนวณ KPI */
+  useEffect(() => {
+    const todaySales = sumSales(ordersToday, { onlyPaid: true, onlyToday: true });
+    const totalSales = sumSales(ordersAll, { onlyPaid: true, onlyToday: false });
+    setStats({
+      todaySales,
+      orderCount: ordersToday.length,
+      reserveCount: reservesToday.length,
+      totalSales,
+    });
+  }, [ordersToday, ordersAll, reservesToday]);
+
   useEffect(() => {
     fetchShop();
-    fetchStats();
-    fetchRecentOrders();
-    fetchTodayReserves();
-  }, [fetchShop, fetchStats, fetchRecentOrders, fetchTodayReserves]);
+    fetchOrdersForKPI();
+    fetchReservesToday();
+  }, [fetchShop, fetchOrdersForKPI, fetchReservesToday]);
 
   const shopName = useMemo(() => shop?.shop_name || "—", [shop]);
 
-  // การ์ด KPI 4 ใบ
+  // การ์ด KPI 4 ใบ — ใช้พาเล็ตกลาง
   const kpiCards = useMemo(
     () => [
-      { key: "todaySales", label: "ยอดขายวันนี้", value: currencyTHB(stats.todaySales), bg: "#10b981" },
-      { key: "orderCount", label: "จำนวนออเดอร์", value: `${stats.orderCount} รายการ`, bg: "#3b82f6" },
-      { key: "reserveCount", label: "จำนวนคนจอง", value: `${stats.reserveCount} รายการ`, bg: "#f59e0b" },
-      { key: "totalSales", label: "ยอดขายทั้งหมด", value: currencyTHB(stats.totalSales), bg: "#6d28d9" },
+      { key: "todaySales",   label: "ยอดขายวันนี้",  value: currencyTHB(stats.todaySales),  bg: c.S1 },
+      { key: "orderCount",   label: "จำนวนออเดอร์",  value: `${stats.orderCount} รายการ`,    bg: c.S2 },
+      { key: "reserveCount", label: "จำนวนคนจอง",    value: `${stats.reserveCount} รายการ`, bg: c.S5 },
+      { key: "totalSales",   label: "ยอดขายทั้งหมด", value: currencyTHB(stats.totalSales),  bg: c.blue },
     ],
     [stats]
   );
@@ -234,7 +276,7 @@ export default function HomeShop() {
           justifyContent: "space-between",
         }}
       >
-        <Text style={{ fontSize: 16, fontWeight: "700" }}>{title}</Text>
+        <Text style={{ fontSize: 16, fontWeight: "700", color: c.black }}>{title}</Text>
         {right}
       </View>
       {children}
@@ -246,78 +288,73 @@ export default function HomeShop() {
       style={{
         height: 96,
         borderRadius: 12,
-        backgroundColor: "#f3f4f6",
+        backgroundColor: c.S4,
         alignItems: "center",
         justifyContent: "center",
         marginRight: 12,
         paddingHorizontal: 16,
       }}
     >
-      <Text style={{ color: "#6b7280" }}>{text}</Text>
+      <Text style={{ color: c.black, opacity: 0.6 }}>{text}</Text>
     </View>
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor:"white" }}>
       <StatusBar barStyle="dark-content" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 30, paddingLeft: 20, paddingRight: 20, paddingBottom: 24 }}
       >
         {/* Header */}
-        <Text style={{ fontSize: 20, marginBottom: 10 }}>ร้าน: {shopName}</Text>
+        <Text style={{ fontSize: 20, marginBottom: 10, color: c.black }}>ร้าน: {shopName}</Text>
 
-        {/* โหลดร้าน */}
+        {/* โหลด/แสดง error ร้าน */}
         {loading && (
           <View style={{ paddingVertical: 16 }}>
-            <ActivityIndicator size="large" />
-            <Text style={{ marginTop: 8, color: "#6b7280" }}>กำลังโหลดข้อมูลร้าน…</Text>
+            <ActivityIndicator size="large" color={c.S2} />
+            <Text style={{ marginTop: 8, color: c.black, opacity: 0.6 }}>กำลังโหลดข้อมูลร้าน…</Text>
           </View>
         )}
-
-        {/* error ร้าน */}
         {!loading && err && (
           <View style={{ paddingVertical: 12 }}>
-            {!!err.status && (
-              <Text style={{ color: "#ef4444", marginBottom: 4 }}>HTTP {err.status}</Text>
-            )}
-            <Text style={{ color: "#ef4444" }}>{err.message}</Text>
+            {!!err.status && <Text style={{ color: c.red, marginBottom: 4 }}>HTTP {err.status}</Text>}
+            <Text style={{ color: c.red }}>{err.message}</Text>
             <Pressable
               onPress={() => {
                 fetchShop();
-                fetchStats();
-                fetchRecentOrders();
-                fetchTodayReserves();
+                fetchOrdersForKPI();
+                fetchReservesToday();
               }}
               style={{
                 marginTop: 10,
                 alignSelf: "flex-start",
                 paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 8,
-                backgroundColor: "#111827",
+                paddingVertical: 8,
+                borderRadius: 10,
+                backgroundColor: c.S2,
               }}
             >
-              <Text style={{ color: "#fff" }}>ลองใหม่</Text>
+              <Text style={{ color: c.fullwhite, fontWeight: "700" }}>ลองใหม่</Text>
             </Pressable>
           </View>
         )}
 
-        {/* KPI 4 ช่อง (เลื่อนซ้าย-ขวา) */}
+        {/* KPI 4 ช่อง */}
         {!err && (
           <Section title="ภาพรวมวันนี้" mt={6}>
-            {statsLoading ? (
+            {ordersLoading && reservesLoading ? (
               <View style={{ paddingVertical: 16 }}>
-                <ActivityIndicator size="small" />
-                <Text style={{ marginTop: 6, color: "#6b7280" }}>กำลังโหลดสถิติ…</Text>
+                <ActivityIndicator size="small" color={c.S2} />
+                <Text style={{ marginTop: 6, color: c.black, opacity: 0.6 }}>กำลังโหลดสถิติ…</Text>
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 12 }}>
-                {kpiCards.map((c) => (
+                {kpiCards.map((k) => (
                   <View
-                    key={c.key}
+                    key={k.key}
                     style={{
-                      backgroundColor: c.bg,
+                      backgroundColor: k.bg,
                       width: 240,
                       height: 110,
                       marginRight: 12,
@@ -326,8 +363,8 @@ export default function HomeShop() {
                       justifyContent: "space-between",
                     }}
                   >
-                    <Text style={{ color: "#ffffffcc", fontSize: 13 }}>{c.label}</Text>
-                    <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>{c.value}</Text>
+                    <Text style={{ color: c.fullwhite, opacity: 0.9, fontSize: 13 }}>{k.label}</Text>
+                    <Text style={{ color: c.fullwhite, fontSize: 22, fontWeight: "800" }}>{k.value}</Text>
                   </View>
                 ))}
               </ScrollView>
@@ -340,18 +377,18 @@ export default function HomeShop() {
           title="ออเดอร์ล่าสุด"
           right={
             <Pressable onPress={() => {}}>
-              <Text style={{ color: "#6b7280" }}>ดูทั้งหมด</Text>
+              <Text style={{ color: c.black, opacity: 0.6 }}>ดูทั้งหมด</Text>
             </Pressable>
           }
         >
           {ordersLoading ? (
             <View style={{ paddingVertical: 12 }}>
-              <ActivityIndicator size="small" />
+              <ActivityIndicator size="small" color={c.S2} />
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 12 }}>
-              {orders.length === 0 && <EmptyRow text="ยังไม่มีออเดอร์วันนี้" />}
-              {orders.map((o) => (
+              {ordersRecent.length === 0 && <EmptyRow text="ยังไม่มีออเดอร์วันนี้" />}
+              {ordersRecent.map((o) => (
                 <Pressable
                   key={o.id}
                   onPress={() => {}}
@@ -359,18 +396,24 @@ export default function HomeShop() {
                     width: 260,
                     height: 120,
                     borderRadius: 16,
-                    backgroundColor: "#f3f4f6",
+                    backgroundColor: c.fullwhite,
+                    borderWidth: 1,
+                    borderColor: c.S3,
                     padding: 14,
                     justifyContent: "space-between",
                     marginRight: 12,
                   }}
                 >
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>{o.customer}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: c.black }}>{o.customer}</Text>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: "#6b7280" }}>{o.status}</Text>
-                    <Text style={{ color: "#6b7280" }}>{o.time}</Text>
+                    <Text style={{ color: c.black, opacity: 0.6 }}>{o.status || "รอดำเนินการ"}</Text>
+                    <Text style={{ color: c.black, opacity: 0.6 }}>
+                      {o.createdAt
+                        ? o.createdAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
+                        : "--:--"}
+                    </Text>
                   </View>
-                  <Text style={{ color: "#111827", fontWeight: "700" }}>{currencyTHB(o.total)}</Text>
+                  <Text style={{ color: c.black, fontWeight: "800" }}>{currencyTHB(o.total)}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -382,18 +425,18 @@ export default function HomeShop() {
           title="การจองวันนี้"
           right={
             <Pressable onPress={() => {}}>
-              <Text style={{ color: c.S1 }}>ดูทั้งหมด</Text>
+              <Text style={{ color: c.S1, fontWeight: "700" }}>ดูทั้งหมด</Text>
             </Pressable>
           }
         >
           {reservesLoading ? (
             <View style={{ paddingVertical: 12 }}>
-              <ActivityIndicator size="small" />
+              <ActivityIndicator size="small" color={c.S2} />
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 12 }}>
-              {reserves.length === 0 && <EmptyRow text="ยังไม่มีการจองวันนี้" />}
-              {reserves.map((r) => (
+              {reservesToday.length === 0 && <EmptyRow text="ยังไม่มีการจองวันนี้" />}
+              {reservesToday.map((r) => (
                 <Pressable
                   key={r.id}
                   onPress={() => {}}
@@ -401,23 +444,28 @@ export default function HomeShop() {
                     width: 220,
                     height: 100,
                     borderRadius: 16,
-                    backgroundColor: "#f3f4f6",
+                    backgroundColor: c.fullwhite,
+                    borderWidth: 1,
+                    borderColor: c.S3,
                     padding: 14,
                     justifyContent: "space-between",
                     marginRight: 12,
                   }}
                 >
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>{r.name}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: c.black }}>{r.name}</Text>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: "#6b7280" }}>{r.people} ที่นั่ง</Text>
-                    <Text style={{ color: "#6b7280" }}>{r.time}</Text>
+                    <Text style={{ color: c.black, opacity: 0.6 }}>{r.people} ที่นั่ง</Text>
+                    <Text style={{ color: c.black, opacity: 0.6 }}>
+                      {r.startAt
+                        ? r.startAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
+                        : "--:--"}
+                    </Text>
                   </View>
                 </Pressable>
               ))}
             </ScrollView>
           )}
         </Section>
-
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,14 +1,16 @@
-// AppTabs.jsx
+// src/Vendor/AppTabs.jsx
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
-// ✅ path ให้ตรงกับโปรเจกต์ของคุณ
+// ✅ ให้ path ตรงกับไฟล์จริง
 import HomeShopScreen from "../Vendor/HomeShop";
 import OrderShopScreen from "../Vendor/OrderShop";
 import MenuShopScreen from "../Vendor/MenuShop";
 import SettingShopScreen from "../Vendor/SettingShop";
 import ReserveShopScreen from "../Vendor/ResevationShop"; 
+
+import { BaseColor as c } from "../components/Color";
 
 const Tab = createBottomTabNavigator();
 
@@ -22,7 +24,7 @@ export default function AppTabs({ shopId, initialRouteName = "Home" }) {
           if (route.name === "Home") name = focused ? "home" : "home-outline";
           else if (route.name === "Orders") name = focused ? "receipt" : "receipt-outline";
           else if (route.name === "Menu") name = focused ? "restaurant" : "restaurant-outline";
-          else if (route.name === "Reserve") name = focused ? "calendar" : "calendar-outline"; // ✅ แท็บจอง
+          else if (route.name === "Reserve") name = focused ? "calendar" : "calendar-outline";
           else if (route.name === "Settings") name = focused ? "settings" : "settings-outline";
           return <Ionicons name={name} size={Number(size) || 22} color={color} />;
         };
@@ -30,11 +32,12 @@ export default function AppTabs({ shopId, initialRouteName = "Home" }) {
         return {
           headerShown: false,
           tabBarShowLabel: true,
-          tabBarActiveTintColor: "#16a34a",
-          tabBarInactiveTintColor: "#9ca3af",
+          tabBarLabelStyle: { fontWeight: "700" },
+          tabBarActiveTintColor: c.S2,          // ส้มหลัก
+          tabBarInactiveTintColor: c.black,     // ไอคอน/ตัวหนังสือจางลงเอง
           tabBarStyle: {
-            backgroundColor: "#f9fafb",
-            borderTopColor: "#e5e7eb",
+            backgroundColor: c.fullwhite,       // พื้นหลังขาว
+            borderTopColor: c.S3,               // เส้นขอบส้มอ่อน
             height: 60,
           },
           tabBarIcon: ({ focused, size, color }) => icon(focused, size, color),
@@ -64,7 +67,7 @@ export default function AppTabs({ shopId, initialRouteName = "Home" }) {
 
       <Tab.Screen
         name="Reserve"
-        component={ReserveShopScreen} // ✅ แท็บรายการจอง
+        component={ReserveShopScreen}
         initialParams={{ shopId: String(shopId || "") }}
         options={{ title: "การจอง" }}
       />

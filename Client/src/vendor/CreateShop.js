@@ -322,7 +322,7 @@ export default function CreateShop({ navigation }) {
         reserve_active: false,
       };
 
-      const res = await api.post("/shops", payload);
+      const res = await api.post("/shop/create", payload);
       Alert.alert("สำเร็จ", `สร้างร้านสำเร็จ\nID: ${res?.data?.id || "-"}`);
       if (navigation?.goBack) navigation.goBack();
     } catch (err) {

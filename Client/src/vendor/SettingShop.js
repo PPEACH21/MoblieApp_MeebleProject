@@ -1,3 +1,4 @@
+// src/Vendor/HomeShop.jsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -20,7 +21,7 @@ import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
-import { styles as baseStyles } from "../Styles/createShopStyle";
+import { BaseColor } from "../components/Color"; 
 
 const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
 const STATUS_OPEN = "open";
@@ -36,9 +37,66 @@ const TYPE_LABEL = {
   Dessert: "Dessert",
 };
 
-/* ---------- small style helpers ---------- */
+/* ---------- Base styles ที่ใช้สีจาก BaseColor ---------- */
+const baseStyles = {
+  container: { flex: 1, padding: 16, backgroundColor: "white" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 22, fontWeight: "800", color: BaseColor.black },
+  error: { color: BaseColor.red, marginTop: 6, textAlign: "center" },
+  retryBtn: {
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: BaseColor.S2,
+  },
+  retryText: { color: BaseColor.fullwhite, fontWeight: "700" },
+  card: {
+    marginTop: 12,
+    backgroundColor: BaseColor.fullwhite,
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: BaseColor.fullblack,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  row: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: BaseColor.S3,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  left: { flexDirection: "row", alignItems: "center" },
+  right: { flexDirection: "row", alignItems: "center" },
+  label: { color: BaseColor.black, fontWeight: "700", marginRight: 8 },
+  value: { color: BaseColor.black, fontWeight: "600" },
+  badge: {
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: "hidden",
+    color: BaseColor.fullwhite,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  noImage: {
+    width: "100%",
+    backgroundColor: BaseColor.S3,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+};
+
+/* ---------- small style helpers (ใช้พาเล็ตจาก BaseColor) ---------- */
 const styles = {
-  ...baseStyles,
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -47,21 +105,21 @@ const styles = {
     marginBottom: 8,
   },
   primaryBtn: {
-    backgroundColor: "#111827",
+    backgroundColor: BaseColor.S2,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  primaryText: { color: "#fff", fontWeight: "700" },
+  primaryText: { color: BaseColor.fullwhite, fontWeight: "700" },
   ghostBtn: {
-    backgroundColor: "#e5e7eb",
+    backgroundColor: BaseColor.S3,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  ghostText: { color: "#111827", fontWeight: "600" },
+  ghostText: { color: BaseColor.black, fontWeight: "700" },
   modalSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: BaseColor.fullwhite,
     padding: 16,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
@@ -72,83 +130,60 @@ const styles = {
     backgroundColor: "rgba(0,0,0,0.25)",
     justifyContent: "flex-end",
   },
-  selectInput: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  selectPlaceholder: { color: "#9ca3af" },
-  selectValue: { color: "#111827", fontWeight: "600" },
   optRow: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: BaseColor.S4,
   },
   dangerBtn: {
-    backgroundColor: "#fee2e2",
+    backgroundColor: "#ffe5e5",
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  dangerText: { color: "#b91c1c", fontWeight: "700" },
-  fieldWrap: {
-    marginBottom: 12,
-  },
-  fieldLabelNice: {
-    color: "#111827",
-    fontWeight: "700",
-    marginBottom: 6,
-  },
+  dangerText: { color: BaseColor.red, fontWeight: "700" },
+
+  /* ฟิลด์แบบ “นิ่ม” */
+  fieldWrap: { marginBottom: 12 },
+  fieldLabelNice: { color: BaseColor.black, fontWeight: "700", marginBottom: 6 },
   fieldBox: {
-    backgroundColor: "#fff",
+    backgroundColor: BaseColor.fullwhite,
     borderWidth: 1.5,
-    borderColor: "#e5e7eb",
+    borderColor: BaseColor.S3,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    shadowColor: "#000",
+    shadowColor: BaseColor.fullblack,
     shadowOpacity: 0.04,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  fieldBoxFocused: {
-    borderColor: "#111827",
-  },
-  inputNice: {
-    fontSize: 16,
-    color: "#111827",
-  },
-  textareaNice: {
-    fontSize: 16,
-    color: "#111827",
-    minHeight: 96,
-    textAlignVertical: "top",
-  },
+  fieldBoxFocused: { borderColor: BaseColor.S2 },
+  inputNice: { fontSize: 16, color: BaseColor.black },
+  textareaNice: { fontSize: 16, color: BaseColor.black, minHeight: 96, textAlignVertical: "top" },
+
+  /* Select แบบกล่อง */
   selectBox: {
-    backgroundColor: "#fff",
+    backgroundColor: BaseColor.fullwhite,
     borderWidth: 1.5,
-    borderColor: "#e5e7eb",
+    borderColor: BaseColor.S3,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: "#000",
+    shadowColor: BaseColor.fullblack,
     shadowOpacity: 0.04,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  selectBoxFocused: {
-    borderColor: "#111827",
-  },
-  selectValueNice: { color: "#111827", fontWeight: "600", fontSize: 16 },
+  selectBoxFocused: { borderColor: BaseColor.S2 },
+  selectValueNice: { color: BaseColor.black, fontWeight: "600", fontSize: 16 },
   selectPlaceholderNice: { color: "#9ca3af", fontSize: 16 },
-  chevron: { marginLeft: 8, opacity: 0.5, fontSize: 16 },
+  chevron: { marginLeft: 8, opacity: 0.5, fontSize: 16, color: BaseColor.black },
 };
 
 /* ---------- utils ---------- */
@@ -195,8 +230,7 @@ async function uriToBase64(uri) {
       encoding: FileSystem.EncodingType.Base64,
     });
   } catch {
-    const filename =
-      uri.split("/").pop()?.split("?")[0] || `picked_${Date.now()}.jpg`;
+    const filename = uri.split("/").pop()?.split("?")[0] || `picked_${Date.now()}.jpg`;
     const dest = FileSystem.cacheDirectory + filename;
     await FileSystem.copyAsync({ from: uri, to: dest });
     return await FileSystem.readAsStringAsync(dest, {
@@ -207,9 +241,7 @@ async function uriToBase64(uri) {
 
 async function ensureBase64(image) {
   if (!image) return { base64: null, passthroughUrl: null };
-  if (/^https?:\/\//i.test(image)) {
-    return { base64: null, passthroughUrl: image };
-  }
+  if (/^https?:\/\//i.test(image)) return { base64: null, passthroughUrl: image };
   if (/^data:/i.test(image)) {
     const b64 = image.split(",")[1] || "";
     return { base64: b64, passthroughUrl: null };
@@ -246,26 +278,17 @@ async function uploadToImgbb(base64) {
 export default function HomeShop() {
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState({
-    shop: false,
-    order: false,
-    reserve: false,
-  });
+  const [saving, setSaving] = useState({ shop: false, order: false, reserve: false });
   const [err, setErr] = useState(null);
 
   // edit modal
   const [openEdit, setOpenEdit] = useState(false);
-  const [edit, setEdit] = useState({
-    shop_name: "",
-    description: "",
-    type: "",
-    image: "",
-  });
+  const [edit, setEdit] = useState({ shop_name: "", description: "", type: "", image: "" });
   const [localImg, setLocalImg] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
-  // ✅ ตัวเปิด/ปิดรายการประเภท (แก้ error setTypePickerOpen)
+  // ✅ ตัวเปิด/ปิดรายการประเภท
   const [typePickerOpen, setTypePickerOpen] = useState(false);
 
   const fetchShop = useCallback(async () => {
@@ -307,19 +330,12 @@ export default function HomeShop() {
       if (val) {
         await updateShopPartial({ status: STATUS_OPEN });
       } else {
-        await updateShopPartial({
-          status: STATUS_CLOSED,
-          order_active: false,
-          reserve_active: false,
-        });
+        await updateShopPartial({ status: STATUS_CLOSED, order_active: false, reserve_active: false });
       }
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะร้านไม่สำเร็จ");
       setErr(er);
-      Alert.alert(
-        `อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`,
-        er.message
-      );
+      Alert.alert(`อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`, er.message);
     } finally {
       setSaving((s) => ({ ...s, shop: false }));
     }
@@ -336,10 +352,7 @@ export default function HomeShop() {
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะรับออเดอร์ไม่สำเร็จ");
       setErr(er);
-      Alert.alert(
-        `อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`,
-        er.message
-      );
+      Alert.alert(`อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`, er.message);
     } finally {
       setSaving((s) => ({ ...s, order: false }));
     }
@@ -356,20 +369,14 @@ export default function HomeShop() {
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะรับการจองไม่สำเร็จ");
       setErr(er);
-      Alert.alert(
-        `อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`,
-        er.message
-      );
+      Alert.alert(`อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`, er.message);
     } finally {
       setSaving((s) => ({ ...s, reserve: false }));
     }
   };
 
   const shopName = useMemo(() => shop?.shop_name || shop?.name || "—", [shop]);
-  const shopImg =
-    shop?.image && String(shop?.image).trim().length > 0
-      ? String(shop.image)
-      : null;
+  const shopImg = shop?.image && String(shop?.image).trim().length > 0 ? String(shop.image) : null;
 
   /* ---------- open edit modal ---------- */
   const openEditModal = () => {
@@ -380,7 +387,7 @@ export default function HomeShop() {
       image: String(shop?.image || ""),
     });
     setLocalImg(String(shop?.image || ""));
-    setTypePickerOpen(false); // reset
+    setTypePickerOpen(false);
     setOpenEdit(true);
   };
 
@@ -437,7 +444,7 @@ export default function HomeShop() {
       const patch = {
         shop_name: edit.shop_name.trim(),
         description: edit.description.trim(),
-        type: edit.type, // ต้องเป็นค่าจาก TYPES ข้างบนเท่านั้น
+        type: edit.type,
         image: imageUrl || "",
       };
       const id = shop?.ID || shop?.id || SHOP_ID;
@@ -450,10 +457,7 @@ export default function HomeShop() {
       await fetchShop();
     } catch (e) {
       const er = toErr(e, "อัปเดตร้านไม่สำเร็จ");
-      Alert.alert(
-        `อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`,
-        er.message
-      );
+      Alert.alert(`อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`, er.message);
     } finally {
       setSubmittingEdit(false);
       setUploadingImage(false);
@@ -461,12 +465,11 @@ export default function HomeShop() {
   };
 
   /* ---------- renders ---------- */
-
   if (loading) {
     return (
       <View style={baseStyles.center}>
-        <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 8 }}>กำลังโหลดข้อมูล…</Text>
+        <ActivityIndicator size="large" color={BaseColor.S2} />
+        <Text style={{ marginTop: 8, color: BaseColor.black }}>กำลังโหลดข้อมูล…</Text>
       </View>
     );
   }
@@ -475,9 +478,7 @@ export default function HomeShop() {
     return (
       <View style={baseStyles.center}>
         <Text style={baseStyles.title}>ร้านของฉัน</Text>
-        {!!err?.status && (
-          <Text style={baseStyles.error}>HTTP {err.status}</Text>
-        )}
+        {!!err?.status && <Text style={baseStyles.error}>HTTP {err.status}</Text>}
         <Text style={baseStyles.error}>{err?.message}</Text>
         <Pressable onPress={fetchShop} style={baseStyles.retryBtn}>
           <Text style={baseStyles.retryText}>ลองใหม่</Text>
@@ -523,7 +524,7 @@ export default function HomeShop() {
               <Text
                 style={[
                   baseStyles.badge,
-                  { backgroundColor: isOpen ? "#16a34a" : "#ef4444" },
+                  { backgroundColor: isOpen ? BaseColor.green : BaseColor.red },
                 ]}
               >
                 {isOpen ? "เปิด" : "ปิด"}
@@ -531,9 +532,14 @@ export default function HomeShop() {
             </View>
             <View style={baseStyles.right}>
               {saving.shop ? (
-                <ActivityIndicator />
+                <ActivityIndicator color={BaseColor.S2} />
               ) : (
-                <Switch value={isOpen} onValueChange={onToggleShop} />
+                <Switch
+                  value={isOpen}
+                  onValueChange={onToggleShop}
+                  trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
+                  thumbColor={isOpen ? BaseColor.S2 : BaseColor.fullwhite}
+                />
               )}
             </View>
           </View>
@@ -547,9 +553,11 @@ export default function HomeShop() {
                   baseStyles.badge,
                   {
                     backgroundColor:
+                      toBool(shop?.order_active) && isOpen ? BaseColor.green : BaseColor.S3,
+                    color:
                       toBool(shop?.order_active) && isOpen
-                        ? "#16a34a"
-                        : "#9ca3af",
+                        ? BaseColor.fullwhite
+                        : BaseColor.black,
                   },
                 ]}
               >
@@ -558,12 +566,18 @@ export default function HomeShop() {
             </View>
             <View style={baseStyles.right}>
               {saving.order ? (
-                <ActivityIndicator />
+                <ActivityIndicator color={BaseColor.S2} />
               ) : (
                 <Switch
                   value={!!toBool(shop?.order_active) && isOpen}
                   onValueChange={onToggleOrder}
                   disabled={!isOpen}
+                  trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
+                  thumbColor={
+                    !!toBool(shop?.order_active) && isOpen
+                      ? BaseColor.S2
+                      : BaseColor.fullwhite
+                  }
                 />
               )}
             </View>
@@ -578,9 +592,11 @@ export default function HomeShop() {
                   baseStyles.badge,
                   {
                     backgroundColor:
+                      toBool(shop?.reserve_active) && isOpen ? BaseColor.blue : BaseColor.S3,
+                    color:
                       toBool(shop?.reserve_active) && isOpen
-                        ? "#6d28d9"
-                        : "#9ca3af",
+                        ? BaseColor.fullwhite
+                        : BaseColor.black,
                   },
                 ]}
               >
@@ -589,21 +605,32 @@ export default function HomeShop() {
             </View>
             <View style={baseStyles.right}>
               {saving.reserve ? (
-                <ActivityIndicator />
+                <ActivityIndicator color={BaseColor.S2} />
               ) : (
                 <Switch
                   value={!!toBool(shop?.reserve_active) && isOpen}
                   onValueChange={onToggleReserve}
                   disabled={!isOpen}
+                  trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
+                  thumbColor={
+                    !!toBool(shop?.reserve_active) && isOpen
+                      ? BaseColor.S2
+                      : BaseColor.fullwhite
+                  }
                 />
               )}
             </View>
           </View>
+
           <View style={baseStyles.row}>
             <View style={baseStyles.left}>
-              <Text style={baseStyles.label}>ประเภท: {shop?.type}</Text>
+              <Text style={baseStyles.label}>ประเภท:</Text>
+              <Text style={baseStyles.value}>
+                {TYPE_LABEL[shop?.type] || shop?.type || "—"}
+              </Text>
             </View>
           </View>
+
           {!!err && (
             <Text style={[baseStyles.error, { marginTop: 12 }]}>
               {err.status ? `HTTP ${err.status}: ` : ""}
@@ -623,30 +650,17 @@ export default function HomeShop() {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalBackdrop}>
             <View style={styles.modalSheet}>
-              <Text
-                style={{ fontSize: 18, fontWeight: "800", marginBottom: 12 }}
-              >
+              <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 12, color: BaseColor.black }}>
                 แก้ไขข้อมูลร้าน
               </Text>
 
               <ScrollView keyboardShouldPersistTaps="handled">
                 {/* รูป */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 16,
-                  }}
-                >
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
                   {localImg ? (
                     <Image
                       source={{ uri: localImg }}
-                      style={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: 12,
-                        backgroundColor: "#e5e7eb",
-                      }}
+                      style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: BaseColor.S3 }}
                     />
                   ) : (
                     <View
@@ -654,22 +668,17 @@ export default function HomeShop() {
                         width: 80,
                         height: 80,
                         borderRadius: 12,
-                        backgroundColor: "#e5e7eb",
+                        backgroundColor: BaseColor.S3,
                         alignItems: "center",
                         justifyContent: "center",
                       }}
                     >
-                      <Text style={{ color: "#9ca3af", fontSize: 12 }}>
-                        ไม่มีรูป
-                      </Text>
+                      <Text style={{ color: "#9ca3af", fontSize: 12 }}>ไม่มีรูป</Text>
                     </View>
                   )}
                   <Pressable
                     onPress={pickImage}
-                    style={[
-                      styles.primaryBtn,
-                      { marginLeft: 12, opacity: uploadingImage ? 0.7 : 1 },
-                    ]}
+                    style={[styles.primaryBtn, { marginLeft: 12, opacity: uploadingImage ? 0.7 : 1 }]}
                     disabled={uploadingImage}
                   >
                     <Text style={styles.primaryText}>
@@ -681,26 +690,15 @@ export default function HomeShop() {
                 {/* ชื่อร้าน */}
                 <View style={styles.fieldWrap}>
                   <Text style={styles.fieldLabelNice}>ชื่อร้าน *</Text>
-                  <View
-                    style={[
-                      styles.fieldBox,
-                      edit._nameFocus && styles.fieldBoxFocused,
-                    ]}
-                  >
+                  <View style={[styles.fieldBox, edit._nameFocus && styles.fieldBoxFocused]}>
                     <TextInput
                       value={edit.shop_name}
-                      onChangeText={(t) =>
-                        setEdit((s) => ({ ...s, shop_name: t }))
-                      }
+                      onChangeText={(t) => setEdit((s) => ({ ...s, shop_name: t }))}
                       placeholder="เช่น Fin Café"
                       placeholderTextColor="#9ca3af"
                       style={styles.inputNice}
-                      onFocus={() =>
-                        setEdit((s) => ({ ...s, _nameFocus: true }))
-                      }
-                      onBlur={() =>
-                        setEdit((s) => ({ ...s, _nameFocus: false }))
-                      }
+                      onFocus={() => setEdit((s) => ({ ...s, _nameFocus: true }))}
+                      onBlur={() => setEdit((s) => ({ ...s, _nameFocus: false }))}
                       returnKeyType="done"
                     />
                   </View>
@@ -709,27 +707,16 @@ export default function HomeShop() {
                 {/* คำอธิบาย */}
                 <View style={styles.fieldWrap}>
                   <Text style={styles.fieldLabelNice}>คำอธิบาย</Text>
-                  <View
-                    style={[
-                      styles.fieldBox,
-                      edit._descFocus && styles.fieldBoxFocused,
-                    ]}
-                  >
+                  <View style={[styles.fieldBox, edit._descFocus && styles.fieldBoxFocused]}>
                     <TextInput
                       value={edit.description}
-                      onChangeText={(t) =>
-                        setEdit((s) => ({ ...s, description: t }))
-                      }
+                      onChangeText={(t) => setEdit((s) => ({ ...s, description: t }))}
                       placeholder="รายละเอียดร้าน"
                       placeholderTextColor="#9ca3af"
                       style={styles.textareaNice}
                       multiline
-                      onFocus={() =>
-                        setEdit((s) => ({ ...s, _descFocus: true }))
-                      }
-                      onBlur={() =>
-                        setEdit((s) => ({ ...s, _descFocus: false }))
-                      }
+                      onFocus={() => setEdit((s) => ({ ...s, _descFocus: true }))}
+                      onBlur={() => setEdit((s) => ({ ...s, _descFocus: false }))}
                     />
                   </View>
                 </View>
@@ -738,23 +725,12 @@ export default function HomeShop() {
                 <View style={styles.fieldWrap}>
                   <Text style={styles.fieldLabelNice}>ประเภท *</Text>
                   <TouchableOpacity
-                    style={[
-                      styles.selectBox,
-                      typePickerOpen && styles.selectBoxFocused,
-                    ]}
+                    style={[styles.selectBox, typePickerOpen && styles.selectBoxFocused]}
                     onPress={() => setTypePickerOpen((v) => !v)}
                     activeOpacity={0.85}
                   >
-                    <Text
-                      style={
-                        edit.type
-                          ? styles.selectValueNice
-                          : styles.selectPlaceholderNice
-                      }
-                    >
-                      {edit.type
-                        ? TYPE_LABEL[edit.type] || edit.type
-                        : "— เลือกประเภท —"}
+                    <Text style={edit.type ? styles.selectValueNice : styles.selectPlaceholderNice}>
+                      {edit.type ? TYPE_LABEL[edit.type] || edit.type : "— เลือกประเภท —"}
                     </Text>
                     <Text style={styles.chevron}>▼</Text>
                   </TouchableOpacity>
@@ -764,19 +740,19 @@ export default function HomeShop() {
                     <View
                       style={{
                         borderWidth: 1.5,
-                        borderColor: "#e5e7eb",
+                        borderColor: BaseColor.S3,
                         borderRadius: 12,
                         marginTop: 8,
                         overflow: "hidden",
-                        backgroundColor: "#fff",
-                        shadowColor: "#000",
+                        backgroundColor: BaseColor.fullwhite,
+                        shadowColor: BaseColor.fullblack,
                         shadowOpacity: 0.04,
                         shadowRadius: 6,
                         shadowOffset: { width: 0, height: 2 },
                         elevation: 2,
                       }}
                     >
-                      {TYPES.map((t, idx) => (
+                      {TYPES.map((t) => (
                         <TouchableOpacity
                           key={t}
                           style={[styles.optRow, { paddingHorizontal: 14 }]}
@@ -786,7 +762,7 @@ export default function HomeShop() {
                           }}
                           activeOpacity={0.9}
                         >
-                          <Text style={{ color: "#111827", fontSize: 16 }}>
+                          <Text style={{ color: BaseColor.black, fontSize: 16 }}>
                             {TYPE_LABEL[t] || t}
                           </Text>
                         </TouchableOpacity>
@@ -796,13 +772,7 @@ export default function HomeShop() {
                 </View>
 
                 {/* ปุ่มล่าง */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    marginTop: 18,
-                  }}
-                >
+                <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 18 }}>
                   <Pressable
                     onPress={() => setOpenEdit(false)}
                     style={[styles.ghostBtn, { marginRight: 8 }]}
@@ -812,10 +782,7 @@ export default function HomeShop() {
                   </Pressable>
                   <Pressable
                     onPress={onSaveEdit}
-                    style={[
-                      styles.primaryBtn,
-                      { opacity: submittingEdit || uploadingImage ? 0.7 : 1 },
-                    ]}
+                    style={[styles.primaryBtn, { opacity: submittingEdit || uploadingImage ? 0.7 : 1 }]}
                     disabled={submittingEdit || uploadingImage}
                   >
                     <Text style={styles.primaryText}>

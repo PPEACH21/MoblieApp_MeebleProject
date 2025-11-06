@@ -3,6 +3,7 @@ export const BaseColor ={
     S2:"#ff8a2b",
     S3:"#ffe3d0",
     S4:"#fceade",
+    S5:"#b7510cff",
     
     black:"#2f2f2f",
     fullblack:"#000",

@@ -1,3 +1,4 @@
+// src/Vendor/OrderShop.jsx
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   View,
@@ -11,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { api } from "../axios";
+import { BaseColor as c } from "../components/Color";
 
 /* ---------- config ---------- */
 const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
@@ -93,7 +95,7 @@ const normalizeOrders = (data) => {
     const rawStatus = String(
       o.status || o.state || o.order_status || "prepare"
     ).toLowerCase();
-    const status = STATUSES.includes(rawStatus) ? rawStatus : rawStatus; // ถ้าไม่ใช่ 3 ตัวหลัก จะเห็นเฉพาะใน "ทั้งหมด"
+    const status = STATUSES.includes(rawStatus) ? rawStatus : rawStatus; // สถานะนอกเหนือ 3 ตัวหลักจะขึ้นใน "ทั้งหมด"
     const createdAt = o.createdAt || o.created_at || o.time || o.timestamp;
     const customer =
       o.customerName ||
@@ -121,17 +123,18 @@ const normalizeOrders = (data) => {
   });
 };
 
-/* ---------- UI helpers ---------- */
+/* ---------- UI helpers (ใช้ BaseColor) ---------- */
 const chipColor = (status) => {
+  // ใช้โทนส้มเป็นหลัก + เขียวเมื่อเสร็จสิ้น
   switch (status) {
     case "prepare":
-      return { bg: "#bfdbfe", fg: "#1e3a8a" }; // ฟ้า
+      return { bg: c.S3, fg: c.S5 };     // ส้มอ่อน + ตัวอักษรส้มเข้ม
     case "ready":
-      return { bg: "#c7d2fe", fg: "#3730a3" }; // ม่วงอ่อน
+      return { bg: c.S2, fg: c.fullwhite }; // ส้มสด + ตัวอักษรขาว
     case "completed":
-      return { bg: "#bbf7d0", fg: "#166534" }; // เขียวอ่อน
+      return { bg: "rgba(43,116,36,0.12)", fg: c.green }; // เขียวอ่อนโปร่ง + เขียวแบรนด์
     default:
-      return { bg: "#e5e7eb", fg: "#111827" }; // เทา สำหรับสถานะอื่น
+      return { bg: c.S4, fg: c.black };  // จาง ๆ อ่านง่าย
   }
 };
 
@@ -155,14 +158,12 @@ export default function OrderShop() {
 
       let res;
       try {
-        // เส้นทางหลัก
         res = await api.get(`/shops/${SHOP_ID}/orders`, {
           params,
           withCredentials: true,
           headers: { "Cache-Control": "no-cache" },
         });
       } catch (e1) {
-        // ถ้า 404 => ไม่มีออเดอร์
         if (e1?.response?.status === 404) {
           setOrders([]);
           setErr(null);
@@ -170,7 +171,6 @@ export default function OrderShop() {
           setRefreshing(false);
           return;
         }
-        // ลองเส้นทางสำรอง
         try {
           res = await api.get(`/shop/${SHOP_ID}/orders`, {
             params,
@@ -185,7 +185,7 @@ export default function OrderShop() {
             setRefreshing(false);
             return;
           }
-          throw e2; // ไม่ใช่ 404 ให้ไปจับด้านนอก
+          throw e2;
         }
       }
 
@@ -255,15 +255,15 @@ export default function OrderShop() {
         onPress={onPress}
         disabled={busy}
         style={{
-          paddingHorizontal: 10,
-          paddingVertical: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 9,
           borderRadius: 10,
           marginLeft: 8,
-          backgroundColor: "#111827",
+          backgroundColor: c.S5, // ปุ่มโทนส้มเข้ม
           opacity: busy ? 0.6 : 1,
         }}
       >
-        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
+        <Text style={{ color: c.fullwhite, fontWeight: "800", fontSize: 12 }}>
           {busy ? "..." : label}
         </Text>
       </Pressable>
@@ -291,12 +291,12 @@ export default function OrderShop() {
     return (
       <View
         style={{
-          backgroundColor: "#fff",
+          backgroundColor: c.fullwhite,
           padding: 14,
           borderRadius: 14,
           marginBottom: 10,
           borderWidth: 1,
-          borderColor: "#e5e7eb",
+          borderColor: c.S3, // เส้นขอบส้มอ่อน
         }}
       >
         {/* header row */}
@@ -307,7 +307,7 @@ export default function OrderShop() {
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 16, fontWeight: "800", color: "#111827" }}>
+          <Text style={{ fontSize: 16, fontWeight: "900", color: c.black }}>
             ออเดอร์ #{o.id?.slice(-6) || "-"}
           </Text>
           <View
@@ -316,24 +316,26 @@ export default function OrderShop() {
               paddingVertical: 6,
               borderRadius: 999,
               backgroundColor: bg,
+              borderWidth: bg === c.S2 ? 0 : 1, // ชิปอ่อนมีเส้นขอบบาง
+              borderColor: bg === c.S2 ? "transparent" : c.S3,
             }}
           >
-            <Text style={{ color: fg, fontWeight: "700", fontSize: 12 }}>
+            <Text style={{ color: fg, fontWeight: "800", fontSize: 12 }}>
               {o.status}
             </Text>
           </View>
         </View>
 
         {/* meta */}
-        <Text style={{ marginTop: 6, color: "#6b7280" }}>
+        <Text style={{ marginTop: 6, color: c.black, opacity: 0.7 }}>
           ลูกค้า:{" "}
-          <Text style={{ color: "#111827", fontWeight: "600" }}>
+          <Text style={{ color: c.black, fontWeight: "700" }}>
             {o.customer || "-"}
           </Text>
         </Text>
-        <Text style={{ marginTop: 2, color: "#6b7280" }}>
+        <Text style={{ marginTop: 2, color: c.black, opacity: 0.7 }}>
           เวลา:{" "}
-          <Text style={{ color: "#111827", fontWeight: "600" }}>
+          <Text style={{ color: c.black, fontWeight: "700" }}>
             {fmtTime(o.createdAt)}
           </Text>
         </Text>
@@ -347,10 +349,10 @@ export default function OrderShop() {
             alignItems: "center",
           }}
         >
-          <Text style={{ color: "#111827" }}>
-            รายการ: <Text style={{ fontWeight: "700" }}>{o.itemsCount}</Text>
+          <Text style={{ color: c.black }}>
+            รายการ: <Text style={{ fontWeight: "800" }}>{o.itemsCount}</Text>
           </Text>
-          <Text style={{ color: "#111827", fontWeight: "800", fontSize: 16 }}>
+          <Text style={{ color: c.black, fontWeight: "900", fontSize: 16 }}>
             {currencyTHB(o.total)}
           </Text>
         </View>
@@ -382,13 +384,15 @@ export default function OrderShop() {
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 999,
-              backgroundColor: active ? "#111827" : "#e5e7eb",
+              backgroundColor: active ? c.S2 : c.S3, // โทนส้ม
+              borderWidth: active ? 0 : 1,
+              borderColor: c.S3,
             }}
           >
             <Text
               style={{
-                color: active ? "#fff" : "#111827",
-                fontWeight: "700",
+                color: active ? c.fullwhite : c.black,
+                fontWeight: "800",
                 fontSize: 12,
               }}
             >
@@ -407,13 +411,13 @@ export default function OrderShop() {
   }, [orders]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f8fafc" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.fullwhite }} edges={["top"]}>
       <StatusBar style="dark" />
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 20, fontWeight: "900", color: "#111827" }}>
+        <Text style={{ fontSize: 20, fontWeight: "900", color: c.black }}>
           ออเดอร์ร้าน
         </Text>
-        <Text style={{ color: "#6b7280", marginTop: 2 }}>
+        <Text style={{ color: c.black, opacity: 0.7, marginTop: 2 }}>
           {filter === "all" ? "ทุกรายการ" : `สถานะ: ${filter}`} • {totals.count} ออเดอร์ • รวม {currencyTHB(totals.sum)}
         </Text>
       </View>
@@ -422,26 +426,26 @@ export default function OrderShop() {
 
       {loading ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 8, color: "#6b7280" }}>กำลังโหลดออเดอร์…</Text>
+          <ActivityIndicator size="large" color={c.S2} />
+          <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>กำลังโหลดออเดอร์…</Text>
         </View>
       ) : err ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
-          {!!err.status && <Text style={{ color: "#ef4444" }}>HTTP {err.status}</Text>}
-          <Text style={{ color: "#ef4444", marginTop: 4, textAlign: "center" }}>
+          {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
+          <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>
             {err.message}
           </Text>
           <Pressable
             onPress={fetchOrders}
             style={{
               marginTop: 12,
-              backgroundColor: "#111827",
+              backgroundColor: c.S2,
               paddingHorizontal: 14,
               paddingVertical: 8,
               borderRadius: 10,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>ลองใหม่</Text>
+            <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
           </Pressable>
         </View>
       ) : (
@@ -455,11 +459,11 @@ export default function OrderShop() {
             paddingBottom: 20,
           }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />
           }
           ListEmptyComponent={() => (
             <View style={{ alignItems: "center", marginTop: 24 }}>
-              <Text style={{ color: "#6b7280" }}>ไม่มีออเดอร์ขณะนี้</Text>
+              <Text style={{ color: c.black, opacity: 0.7 }}>ไม่มีออเดอร์ขณะนี้</Text>
             </View>
           )}
         />

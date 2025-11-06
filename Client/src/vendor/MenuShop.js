@@ -1,3 +1,4 @@
+// src/Vendor/MenuShop.jsx
 import React, { useCallback, useState } from "react";
 import {
   View, Text, FlatList, ActivityIndicator, Image, Pressable, Modal,
@@ -10,6 +11,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
 import { api } from "../axios";
+import { BaseColor as c } from "../components/Color";
 
 /* ---------- config ---------- */
 const { imgbbKey } = (Constants?.expoConfig?.extra ?? {});
@@ -88,9 +90,7 @@ const getId = (it) => it?.id || it?.ID || it?._id || null;
 /* ---------- component ---------- */
 export default function MenuShop() {
   const route = useRoute();
-
-  // ✅ อ่าน shopId จาก params หรือ fallback
-  const shopId = route?.params?.shopId ?? "qIcsHxOuL5uAtW4TwAeV";
+  const shopId = "qIcsHxOuL5uAtW4TwAeV";
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -201,7 +201,6 @@ export default function MenuShop() {
         withCredentials: true,
       });
 
-      // sync จริง
       await fetchMenu();
     } catch (e) {
       const er = toErr(e, "ลบเมนูไม่สำเร็จ");
@@ -209,7 +208,6 @@ export default function MenuShop() {
         `ลบเมนูไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`,
         er.message
       );
-      // rollback (รีโหลดใหม่)
       fetchMenu();
     }
   };
@@ -287,7 +285,7 @@ export default function MenuShop() {
           return;
         }
 
-        // optimistic update ก่อน
+        // optimistic update
         setItems((prev) =>
           prev.map((x) =>
             getId(x) === menuId ? { ...x, ...payload, id: getId(x) } : x
@@ -298,14 +296,12 @@ export default function MenuShop() {
           withCredentials: true,
         });
 
-        // ถ้า server คืนของเวอร์ชันล่าสุดมาก็ซิงก์ตาม
         const updated = res?.data?.item || res?.data?.data || res?.data || null;
         if (updated && typeof updated === "object") {
           setItems((prev) =>
             prev.map((x) => (getId(x) === menuId ? { ...x, ...updated } : x))
           );
         } else {
-          // หรือรีเฟรชเพื่อความชัวร์
           await fetchMenu();
         }
       }
@@ -323,61 +319,59 @@ export default function MenuShop() {
     }
   };
 
-  /* ---------- Render ---------- */
+  /* ---------- Render each item ---------- */
   const renderItem = ({ item }) => {
     const img = String(item?.image || item?.Image || "").trim();
     const id = getId(item);
 
     return (
       <Pressable
-        onPress={() => openEdit(item)} // ✅ แตะรายการเพื่อแก้ไข
+        onPress={() => openEdit(item)}
         style={{
           flexDirection: "row",
-          backgroundColor: "#f8fafc",
+          backgroundColor: c.fullwhite,
           borderRadius: 14,
           padding: 12,
           marginBottom: 10,
           alignItems: "center",
+          borderWidth: 1,
+          borderColor: c.S3,
         }}
       >
         {img ? (
           <Image
             source={{ uri: img }}
-            style={{ width: 68, height: 68, borderRadius: 12, backgroundColor: "#e5e7eb" }}
+            style={{ width: 68, height: 68, borderRadius: 12, backgroundColor: c.S3 }}
             resizeMode="cover"
           />
         ) : (
           <View
             style={{
               width: 68, height: 68, borderRadius: 12,
-              backgroundColor: "#e5e7eb", alignItems: "center", justifyContent: "center",
+              backgroundColor: c.S3, alignItems: "center", justifyContent: "center",
             }}
           >
-            <Text style={{ color: "#9ca3af", fontSize: 12 }}>ไม่มีรูป</Text>
+            <Text style={{ color: c.black, opacity: 0.5, fontSize: 12 }}>ไม่มีรูป</Text>
           </View>
         )}
 
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: c.black }}>
             {item?.name ?? item?.Name ?? "-"}
           </Text>
           {!!(item?.description ?? item?.Description) && (
-            <Text style={{ color: "#6b7280", marginTop: 2 }} numberOfLines={2}>
+            <Text style={{ color: c.black, opacity: 0.7, marginTop: 2 }} numberOfLines={2}>
               {item?.description ?? item?.Description}
             </Text>
           )}
-          <Text style={{ color: "#111827", marginTop: 6, fontWeight: "700" }}>
+          <Text style={{ color: c.black, marginTop: 6, fontWeight: "800" }}>
             {currencyTHB(item?.price ?? item?.Price)}
           </Text>
         </View>
 
-        {/* ปุ่มลบทางขวา */}
         {!!id && (
-          <Pressable
-            onPress={() => confirmDelete(item)}
-            style={{ paddingHorizontal: 10, paddingVertical: 6 }}
-          >
-            <Text style={{ color: "#ef4444", fontWeight: "700" }}>ลบ</Text>
+          <Pressable onPress={() => confirmDelete(item)} style={{ paddingHorizontal: 10, paddingVertical: 6 }}>
+            <Text style={{ color: c.red, fontWeight: "700" }}>ลบ</Text>
           </Pressable>
         )}
       </Pressable>
@@ -386,34 +380,39 @@ export default function MenuShop() {
 
   /* ---------- UI ---------- */
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.fullwhite }}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View style={{ flex: 1 }}>
           <FlatList
             data={items}
             keyExtractor={(it, i) => String(getId(it) || `${it?.name || it?.Name}-${i}`)}
             renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+            contentContainerStyle={{ paddingBottom: 24, flexGrow: 1, paddingHorizontal: 20, paddingTop: 10 }}
             refreshing={refreshing}
             onRefresh={onRefresh}
             keyboardShouldPersistTaps="handled"
-            alwaysBounceVertical={true}
+            alwaysBounceVertical
             overScrollMode="always"
             ListHeaderComponent={
               <View
                 style={{
-                  paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6,
-                  flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                  paddingBottom: 6,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
-                <Text style={{ fontSize: 20, fontWeight: "800" }}>เมนูในร้าน</Text>
+                <Text style={{ fontSize: 20, fontWeight: "800", color: c.black }}>เมนูในร้าน</Text>
                 <Pressable
                   onPress={openCreate}
                   style={{
-                    backgroundColor: "#111827", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                    backgroundColor: c.S2,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 10,
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "600" }}>+ สร้างเมนู</Text>
+                  <Text style={{ color: c.fullwhite, fontWeight: "700" }}>+ สร้างเมนู</Text>
                 </Pressable>
               </View>
             }
@@ -421,26 +420,30 @@ export default function MenuShop() {
               <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
                 {loading ? (
                   <>
-                    <ActivityIndicator size="large" />
-                    <Text style={{ marginTop: 8, color: "#6b7280" }}>กำลังโหลดเมนู…</Text>
+                    <ActivityIndicator size="large" color={c.S2} />
+                    <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>กำลังโหลดเมนู…</Text>
                   </>
                 ) : err ? (
                   <View style={{ alignItems: "center", paddingHorizontal: 24 }}>
-                    {!!err.status && <Text style={{ color: "#ef4444" }}>HTTP {err.status}</Text>}
-                    <Text style={{ color: "#ef4444", marginTop: 4, textAlign: "center" }}>
+                    {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
+                    <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>
                       {err.message}
                     </Text>
                     <Pressable
                       onPress={fetchMenu}
                       style={{
-                        marginTop: 12, backgroundColor: "#111827", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                        marginTop: 12,
+                        backgroundColor: c.S2,
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 10,
                       }}
                     >
-                      <Text style={{ color: "#fff" }}>ลองใหม่</Text>
+                      <Text style={{ color: c.fullwhite, fontWeight: "700" }}>ลองใหม่</Text>
                     </Pressable>
                   </View>
                 ) : (
-                  <Text style={{ color: "#6b7280" }}>ยังไม่มีเมนู — ปัดลงเพื่อรีเฟรช</Text>
+                  <Text style={{ color: c.black, opacity: 0.7 }}>ยังไม่มีเมนู — ปัดลงเพื่อรีเฟรช</Text>
                 )}
               </View>
             )}
@@ -463,51 +466,61 @@ export default function MenuShop() {
                 <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%" }}>
                   <ScrollView
                     contentContainerStyle={{
-                      backgroundColor: "#fff", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16,
+                      backgroundColor: c.fullwhite,
+                      borderTopLeftRadius: 16,
+                      borderTopRightRadius: 16,
+                      padding: 16,
                     }}
                     keyboardShouldPersistTaps="handled"
                   >
-                    <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 12 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 12, color: c.black }}>
                       {mode === "create" ? "สร้างเมนูใหม่" : "แก้ไขเมนู"}
                     </Text>
 
                     {/* รูปภาพ + ปุ่มเลือกรูป */}
                     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
                       {localImageUri ? (
-                        <Image source={{ uri: localImageUri }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: "#e5e7eb" }} />
+                        <Image source={{ uri: localImageUri }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: c.S3 }} />
                       ) : form.image ? (
-                        <Image source={{ uri: form.image }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: "#e5e7eb" }} />
+                        <Image source={{ uri: form.image }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: c.S3 }} />
                       ) : (
-                        <View style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: "#e5e7eb", alignItems: "center", justifyContent: "center" }}>
-                          <Text style={{ color: "#9ca3af", fontSize: 12 }}>ไม่มีรูป</Text>
+                        <View style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: c.S3, alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ color: c.black, opacity: 0.5, fontSize: 12 }}>ไม่มีรูป</Text>
                         </View>
                       )}
 
                       <Pressable
                         onPress={onPickImage}
                         style={{
-                          marginLeft: 12, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10,
-                          backgroundColor: "#111827", opacity: uploadingImage ? 0.7 : 1,
+                          marginLeft: 12,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                          borderRadius: 10,
+                          backgroundColor: c.S2,
+                          opacity: uploadingImage ? 0.7 : 1,
                         }}
                         disabled={uploadingImage}
                       >
-                        <Text style={{ color: "#fff", fontWeight: "600" }}>
+                        <Text style={{ color: c.fullwhite, fontWeight: "700" }}>
                           {uploadingImage ? "กำลังอัปโหลด…" : (mode === "create" ? "เลือกรูปจากเครื่อง" : "เปลี่ยนรูป")}
                         </Text>
                       </Pressable>
                     </View>
 
-                    <Text style={{ color: "#374151", marginBottom: 6 }}>ชื่อเมนู</Text>
+                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>ชื่อเมนู</Text>
                     <TextInput
                       value={form.name}
                       onChangeText={(t) => setForm((s) => ({ ...s, name: t }))}
                       placeholder="เช่น ลาเต้เย็น"
                       returnKeyType="done"
                       onSubmitEditing={Keyboard.dismiss}
-                      style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10 }}
+                      style={{
+                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
+                        paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10, backgroundColor: c.fullwhite, color: c.black,
+                      }}
                     />
 
-                    <Text style={{ color: "#374151", marginBottom: 6 }}>ราคา (บาท)</Text>
+                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>ราคา (บาท)</Text>
                     <TextInput
                       value={form.price}
                       onChangeText={(t) => setForm((s) => ({ ...s, price: t }))}
@@ -515,10 +528,13 @@ export default function MenuShop() {
                       keyboardType="numeric"
                       returnKeyType="done"
                       onSubmitEditing={Keyboard.dismiss}
-                      style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10 }}
+                      style={{
+                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
+                        paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10, backgroundColor: c.fullwhite, color: c.black,
+                      }}
                     />
 
-                    <Text style={{ color: "#374151", marginBottom: 6 }}>
+                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>
                       ลิงก์รูปภาพ (ถูกเติมอัตโนมัติหลังอัปโหลด)
                     </Text>
                     <TextInput
@@ -527,23 +543,29 @@ export default function MenuShop() {
                       placeholder="https://…"
                       autoCapitalize="none"
                       editable={false}
-                      style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10, backgroundColor: "#f3f4f6" }}
+                      style={{
+                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
+                        paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10,
+                        backgroundColor: c.S4, color: c.black, opacity: 0.9,
+                      }}
                     />
 
-                    <Text style={{ color: "#374151", marginBottom: 6 }}>คำอธิบาย (ไม่บังคับ)</Text>
+                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>คำอธิบาย (ไม่บังคับ)</Text>
                     <TextInput
                       value={form.description}
                       onChangeText={(t) => setForm((s) => ({ ...s, description: t }))}
                       placeholder="รายละเอียดเมนู"
                       multiline
-                      blurOnSubmit={true}
+                      blurOnSubmit
                       returnKeyType="done"
                       onSubmitEditing={Keyboard.dismiss}
-                      style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, minHeight: 80 }}
+                      style={{
+                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
+                        paddingHorizontal: 12, paddingVertical: 10, minHeight: 80, backgroundColor: c.fullwhite, color: c.black,
+                      }}
                     />
 
                     <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 14 }}>
-                      {/* ปุ่มลบ เฉพาะโหมดแก้ไข */}
                       {mode === "edit" ? (
                         <Pressable
                           onPress={() => confirmDelete({ id: editingId, name: form.name })}
@@ -564,22 +586,23 @@ export default function MenuShop() {
                           onPress={() => setOpenModal(false)}
                           style={{
                             paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
-                            backgroundColor: "#e5e7eb", marginRight: 8,
+                            backgroundColor: c.S3, marginRight: 8,
                           }}
                           disabled={submitting || uploadingImage}
                         >
-                          <Text style={{ color: "#111827" }}>ยกเลิก</Text>
+                          <Text style={{ color: c.black, fontWeight: "700" }}>ยกเลิก</Text>
                         </Pressable>
 
                         <Pressable
                           onPress={onSubmit}
                           style={{
                             paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
-                            backgroundColor: "#111827", opacity: submitting || uploadingImage ? 0.7 : 1,
+                            backgroundColor: c.S5, // ส้มเข้มขึ้น
+                            opacity: submitting || uploadingImage ? 0.7 : 1,
                           }}
                           disabled={submitting || uploadingImage}
                         >
-                          <Text style={{ color: "#fff", fontWeight: "700" }}>
+                          <Text style={{ color: c.fullwhite, fontWeight: "700" }}>
                             {submitting ? "กำลังบันทึก…" : (mode === "create" ? "บันทึก" : "อัปเดต")}
                           </Text>
                         </Pressable>
