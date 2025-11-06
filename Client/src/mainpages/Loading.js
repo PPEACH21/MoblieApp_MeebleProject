@@ -15,7 +15,7 @@ const Loading =()=>{
     };
 
     return(
-            <View style={[Layout.centerset,{position:'absolute',width:'100%',height:'100%'}]}>
+            <View style={[Layout.centerset,{position:'absolute',width:'100%',height:'100%',backgroundColor:'transparent'}]}>
             <BlurView
                 intensity={80} 
                 tint="light" 
@@ -23,7 +23,7 @@ const Loading =()=>{
                 position: "absolute",
                 width: "100%",
                 height: "100%",
-                backgroundColor: "rgba(0, 0, 0, 0.38)", 
+                backgroundColor: "rgba(0, 0, 0, 0.7)", 
                 }}
             />
             <Animated.View
@@ -35,6 +35,7 @@ const Loading =()=>{
                     animationIterationCount: 'infinite',
                     animationTimingFunction: 'ease-in-out',
                     animationDirection: 'alternate',
+                    backgroundColor:'tranparent'
                 },
                 ]}
             >
