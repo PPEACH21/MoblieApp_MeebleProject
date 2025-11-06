@@ -1,15 +1,14 @@
 import { View,Text } from "react-native"
 import {BaseColor as c} from "../../components/Color"
 import Loading from "../../mainpages/Loading";
-
-const U_Home = ()=>{
+const V_Home = ()=>{
     return(
         
         <View>
-            <Text>PAGE: USER_Home</Text>
+            <Text>PAGE: V_Home</Text>
 
         </View>
     );
 }
 
-export default U_Home;
+export default V_Home;

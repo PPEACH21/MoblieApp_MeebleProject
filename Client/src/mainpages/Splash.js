@@ -1,6 +1,8 @@
 import { Text, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback  } from "react-native";
 import { useEffect, useState } from "react";
 import { TEXTinput, TextInputSplash } from "../components/TextInput";
+import Loading from "./Loading";
+
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -13,21 +15,36 @@ import { Layout } from "../components/Layout";
 import { BaseColor as c } from "../components/Color";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Btn } from "../components/Button";
-
+import { useDispatch,useSelector } from "react-redux";
+import { loginUser } from "../redux/actions/authAction";
+import { getProfile } from "../redux/actions/authAction";
 const Splash = ({ navigation }) => {
 
     //AUTH TEST
-    const [auth, setAuth] = useState(false)
-    useEffect(() => {
-        setTimeout(() => {
-            console.log("Loading Auth");
-            if (auth) {
-                navigation.replace("HomeUser")
-            }
+    // const [auth, setAuth] = useState(false)
+    const Dispath = useDispatch();
+    const Auth = useSelector((state) => state.auth); 
+    const CheckAuth =()=>{
+        console.log("Loading Auth");
+        if (Auth.role==="user") {
+            navigation.replace("HomeUser")
         }
-            , 4000)
+        if (Auth.role==="vendor") {
+            navigation.replace("HomeVendor")
+        }
+    }
 
-    }, [])
+
+    useEffect(() => {
+        setTimeout(() => {CheckAuth()}, 4000)
+    },[])
+
+    useEffect(() => {
+    if (Auth.user) {
+        console.log("USER:", Auth.user);
+        CheckAuth(); // เรียกหลัง login สำเร็จ
+    }
+    }, [Auth.user]);
     //AUTH TEST
 
     //AnimationSet
@@ -79,7 +96,7 @@ const Splash = ({ navigation }) => {
         };
     });
 
-    const opacityOpen = useSharedValue(1);
+    const opacityOpen = useSharedValue(0);
     const WelcomeSlice = () => {
         opacityOpen.value = withSequence(
             withDelay(1800, withTiming(0)),
@@ -92,7 +109,7 @@ const Splash = ({ navigation }) => {
         };
     });
 
-    const yOpenmove = useSharedValue(0);
+    const yOpenmove = useSharedValue(600);
     const Openmove = useAnimatedStyle(() => ({
         transform: [
             {
@@ -105,8 +122,8 @@ const Splash = ({ navigation }) => {
     }));
 
     const [login, setlogin] = useState(false);
-    const yLogin = useSharedValue(0);
-    const yLoginHead = useSharedValue(0);
+    const yLogin = useSharedValue(600);
+    const yLoginHead = useSharedValue(2);
     const LoginTrigger = useAnimatedStyle(() => ({
         transform: [
             {
@@ -129,7 +146,7 @@ const Splash = ({ navigation }) => {
     }));
 
     const [register, setRegister] = useState(false);
-    const yRegister = useSharedValue(200);
+    const yRegister = useSharedValue(600);
     const yRegisterHead = useSharedValue(200);
     const RegisterTrigger = useAnimatedStyle(() => ({
         transform: [
@@ -259,19 +276,40 @@ const Splash = ({ navigation }) => {
     //dataset
 
     //validation
-    const SubmitLogin=()=>{
+    const SubmitLogin=async()=>{
+        setErrmsg("")
         if(logininput.Username==="" || logininput.Password===""){
-            setErrmsg("your must fill information")
+            return setErrmsg("your must fill information")
+        }
+        
+        console.log(`Username: ${logininput.Username}`);
+        console.log(`Password: ${logininput.Password}`);
+        try{
+
+            await Dispath(loginUser({
+                Username:logininput.Username,
+                Password:logininput.Password,
+            }))
+            console.log(`user: ${Auth.user}`);
+            console.log("Login start triggered ✅");
+            
+        }catch(err){            
+            console.log("Login Fail ");
         }
 
-
-        // if(logininput.Username==="")
+        CheckAuth();
+        getProfile()
     }
     const SubmitRegister=()=>{
 
-    }
 
-    //
+    }
+    //validation
+
+    
+    if(Auth.loading){
+        return <Loading/>
+    }
     return (
         <SafeAreaView style={[Layout.centerset, { backgroundColor: c.white }]}>
             <TouchableWithoutFeedback onPress={() => {setlogin(false);setRegister(false);setIsToggled(false);}}>
@@ -342,7 +380,7 @@ const Splash = ({ navigation }) => {
                 </View>
 
                 <View style={[{ flex: 1 }]}>
-                    {!auth && (
+                    {Auth && (
                         <View style={[Layout.centerset, Layout.rowset, { justifyContent: 'space-evenly' }]} >
                             <TouchableOpacity onPress={() => { 
                                 setRegister(true), 
@@ -403,7 +441,7 @@ const Splash = ({ navigation }) => {
                     {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
                     <TouchableOpacity
                         style={[Btn.Btn1, { width: '100%' }]}
-                        onPress={() => { setlogin(false), setRegister(false), setIsToggled(false); }}
+                        onPress={SubmitLogin}
                     >
                         <Text style={{ textAlign: 'center' }}>SignIn</Text>
                     </TouchableOpacity>
@@ -432,6 +470,7 @@ const Splash = ({ navigation }) => {
                     <Text>You dont have user</Text>
                 </View>
             </Animated.View>
+            {Auth.loading&&(<Loading/>)}
         </SafeAreaView>
     );
 };
