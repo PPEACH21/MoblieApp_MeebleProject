@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BaseColor as c}  from "../components/Color";
 import { api } from "../axios";
 
 const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
@@ -381,7 +382,7 @@ export default function HomeShop() {
           title="การจองวันนี้"
           right={
             <Pressable onPress={() => {}}>
-              <Text style={{ color: "#6b7280" }}>ดูทั้งหมด</Text>
+              <Text style={{ color: c.S1 }}>ดูทั้งหมด</Text>
             </Pressable>
           }
         >

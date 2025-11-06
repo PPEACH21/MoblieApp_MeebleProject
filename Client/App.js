@@ -1,23 +1,16 @@
+import { useState } from "react";
+import { StyleSheet, Text, View, Button } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View } from "react-native";
-import { Button } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { enableScreens } from "react-native-screens";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import AppTabs from "./src/Navigation/appTab.js";
+import StackNav from "./src/StackNav.js";
+
+// i18n (Paraglide)
 import { getLocale, setLocale } from "./paraglide/runtime.js";
 import { m } from "./paraglide/messages.js";
-import { useState } from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import HomeShop from "./src/Vendor/HomeShop.js";
-import AppTabs from "./src/Navigation/appTab.js";
-import { enableScreens } from 'react-native-screens';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import { Button } from 'react-native';
-import { m } from './paraglide/messages.js';
-import { getLocale,setLocale } from './paraglide/runtime.js';
-import { useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import StackNav from './src/StackNav.js';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import U_Home from './src/User/pages/U_Home.js';
 
 export default function App() {
   const [language, setLaguage] = useState(getLocale());
@@ -43,5 +36,11 @@ export default function App() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
 
 

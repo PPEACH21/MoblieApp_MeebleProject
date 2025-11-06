@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules/
+Client/package_lock.json
 
 # Expo
 .expo/

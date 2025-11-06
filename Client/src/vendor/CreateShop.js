@@ -6,15 +6,15 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
-  StyleSheet,
   Alert,
   ScrollView,
-  Platform,
   Modal,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
+import * as FileSystem from "expo-file-system";
+import Constants from "expo-constants";
 import { api } from "../axios";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -34,10 +34,7 @@ function SelectField({ label, value, options = [], onChange }) {
     <View style={{ marginBottom: 10 }}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
 
-      <TouchableOpacity
-        style={styles.selectInput}
-        onPress={() => setOpen(true)}
-      >
+      <TouchableOpacity style={styles.selectInput} onPress={() => setOpen(true)}>
         <Text style={value ? styles.selectText : styles.selectPlaceholder}>
           {currentLabel}
         </Text>
@@ -80,11 +77,93 @@ function SelectField({ label, value, options = [], onChange }) {
   );
 }
 
+/* ---------- image helpers: robust base64 ---------- */
+
+// เดา MIME จากนามสกุลไฟล์
+function guessMimeFromUri(uri = "") {
+  const lower = uri.split("?")[0].toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/heic";
+  return "image/jpeg";
+}
+
+// อ่านไฟล์เป็น base64; ถ้าอ่านตรง ๆ ไม่ได้ (content://, ph://) ให้ก็อปไป cache ก่อน
+async function uriToBase64(uri) {
+  try {
+    return await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  } catch {
+    const filename =
+      uri.split("/").pop()?.split("?")[0] || `picked_${Date.now()}.jpg`;
+    const dest = FileSystem.cacheDirectory + filename;
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    return await FileSystem.readAsStringAsync(dest, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  }
+}
+
+// รับค่ารูป (อาจเป็น data:, http(s)://, หรือ file/content URI) -> คืน { base64, mime }
+// - http(s):// : ไม่ต้องอัปโหลด imgbb (ส่งคืน null เพื่อใช้ URL เดิมได้)
+// - data:...    : ดึง base64 ต่อได้ทันที
+// - file/content: อ่าน base64 จากไฟล์
+async function ensureBase64AndMime(image) {
+  if (!image) return { base64: null, mime: null, urlPassthrough: null };
+
+  // เคสเป็น URL อยู่แล้ว ไม่ต้องอัปโหลด
+  if (/^https?:\/\//i.test(image)) {
+    return { base64: null, mime: null, urlPassthrough: image };
+  }
+
+  // เคสเป็น data URL
+  if (/^data:/i.test(image)) {
+    const [meta, b64] = image.split(",");
+    const mimeMatch = /^data:([^;]+);base64$/i.exec(meta || "");
+    const mime = mimeMatch?.[1] || "image/jpeg";
+    return { base64: b64 || "", mime, urlPassthrough: null };
+  }
+
+  // เคสเป็น file://, content://, ph://
+  const mime = guessMimeFromUri(image);
+  const base64 = await uriToBase64(image);
+  return { base64, mime, urlPassthrough: null };
+}
+
+// อัปโหลดไป imgbb (รับ base64 “ล้วน ๆ” ไม่เอา prefix data:)
+async function uploadToImgbb(base64) {
+  const key =
+    process.env.EXPO_PUBLIC_IMGBB_KEY ||
+    (Constants?.expoConfig?.extra?.imgbbKey ?? "");
+  if (!key) throw new Error("ยังไม่ได้ตั้งค่า IMGBB KEY");
+
+  const fd = new FormData();
+  fd.append("key", key);
+  fd.append("image", base64);
+
+  const resp = await fetch("https://api.imgbb.com/1/upload", {
+    method: "POST",
+    body: fd,
+  });
+  const json = await resp.json();
+
+  if (!json?.success) {
+    const msg =
+      json?.error?.message ||
+      json?.data?.error?.message ||
+      "อัปโหลดรูปไป imgbb ไม่สำเร็จ";
+    throw new Error(msg);
+  }
+  return json?.data?.display_url || json?.data?.url;
+}
+
 export default function CreateShop({ navigation }) {
   const [shopName, setShopName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("");
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState(null); // เก็บได้ทั้ง data:, uri, หรือ url
   const [imageUploading, setImageUploading] = useState(false);
 
   const [coord, setCoord] = useState(DEFAULT_COORD);
@@ -113,7 +192,7 @@ export default function CreateShop({ navigation }) {
     })();
   }, []);
 
-  /* ---------- image ---------- */
+  /* ---------- image pick ---------- */
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
@@ -124,35 +203,43 @@ export default function CreateShop({ navigation }) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 0.8,
-      base64: true,
+      base64: true, // ขอ base64 มาเลย ถ้าบางเคสไม่มี จะ fallback อ่านเอง
     });
     if (!result.canceled) {
       const a = result.assets[0];
-      if (a.base64)
-        setImage(`data:${a.mimeType || "image/jpeg"};base64,${a.base64}`);
-      else if (a.uri) setImage(a.uri);
+      if (a.base64) {
+        // บางแพลตฟอร์มไม่มี a.mimeType → เดาเอาจาก uri
+        const mime = a.mimeType || guessMimeFromUri(a.uri);
+        setImage(`data:${mime};base64,${a.base64}`);
+      } else if (a.uri) {
+        // เก็บ uri ไว้ก่อน เดี๋ยวไปอ่าน base64 ตอนอัปโหลด
+        setImage(a.uri);
+      }
     }
   };
 
+  // คืน URL ที่พร้อมส่ง backend:
+  // - ถ้าเป็น URL อยู่แล้ว → ส่งคืน URL เดิม
+  // - ถ้าเป็น data:/file:/content: → แปลง base64 แล้วอัปโหลด imgbb → ส่งคืน URL ของ imgbb
   const uploadImageIfNeeded = async () => {
     if (!image) return "";
-    if (/^https?:\/\//i.test(image)) return image;
     try {
       setImageUploading(true);
-      const key = process.env.EXPO_PUBLIC_IMGBB_KEY;
-      if (key && image.startsWith("data:")) {
-        const fd = new FormData();
-        const base64 = image.split(",")[1] || image;
-        fd.append("key", key);
-        fd.append("image", base64);
-        const resp = await fetch("https://api.imgbb.com/1/upload", {
-          method: "POST",
-          body: fd,
-        });
-        const data = await resp.json();
-        if (data?.success && data?.data?.url) return data.data.url;
+
+      const { base64, urlPassthrough } = await ensureBase64AndMime(image);
+
+      if (urlPassthrough) {
+        // เป็น URL http(s) อยู่แล้ว
+        return urlPassthrough;
       }
-      return image;
+
+      if (!base64) {
+        // ไม่ควรเกิด แต่กันไว้
+        return "";
+      }
+
+      const url = await uploadToImgbb(base64);
+      return url;
     } finally {
       setImageUploading(false);
     }
@@ -223,7 +310,7 @@ export default function CreateShop({ navigation }) {
     if (!type) return Alert.alert("กรอกข้อมูล", "กรุณาเลือกประเภท");
 
     try {
-      const imageUrl = await uploadImageIfNeeded();
+      const imageUrl = await uploadImageIfNeeded(); // ← ใช้ตัวใหม่ (robust base64)
       const payload = {
         shop_name: shopName.trim(),
         description: description.trim(),
@@ -268,7 +355,7 @@ export default function CreateShop({ navigation }) {
             style={styles.input}
           />
 
-          <Text style={styles.label}>คำอธิบาย</Text>
+        <Text style={styles.label}>คำอธิบาย</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
@@ -338,16 +425,11 @@ export default function CreateShop({ navigation }) {
             )}
           </View>
 
-          <Text style={[styles.label, { marginTop: 8 }]}>
-            ตำแหน่งร้านบนแผนที่
-          </Text>
+          <Text style={[styles.label, { marginTop: 8 }]}>ตำแหน่งร้านบนแผนที่</Text>
           <MapView
             ref={(r) => (mapRef.current = r)}
             style={styles.map}
-            onPress={(e) => {
-              const { latitude, longitude } = e.nativeEvent.coordinate;
-              setCoord({ latitude, longitude });
-            }}
+            onPress={handleMapPress}
             initialRegion={{
               latitude: coord.latitude,
               longitude: coord.longitude,
@@ -376,10 +458,7 @@ export default function CreateShop({ navigation }) {
           >
             <Text style={[styles.buttonText, styles.ghostText]}>ยกเลิก</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={submit}
-            style={[styles.button, styles.primary]}
-          >
+          <TouchableOpacity onPress={submit} style={[styles.button, styles.primary]}>
             <Text style={styles.buttonText}>สร้างร้าน</Text>
           </TouchableOpacity>
         </View>

@@ -7,16 +7,151 @@ import {
   Alert,
   Pressable,
   Image,
-  StatusBar
+  Modal,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { api } from "../axios";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { styles } from "../Styles/createShopStyle";
+import { StatusBar } from "expo-status-bar";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import Constants from "expo-constants";
+import { styles as baseStyles } from "../Styles/createShopStyle";
 
 const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
 const STATUS_OPEN = "open";
 const STATUS_CLOSED = "closed";
 
+/** 🔁 ให้ตรงกับ backend (models.AllowedTypes) */
+const TYPES = ["MainCourse", "Beverage", "FastFoods", "Appetizer", "Dessert"];
+const TYPE_LABEL = {
+  MainCourse: "Main Course",
+  Beverage: "Beverage",
+  FastFoods: "Fast Foods",
+  Appetizer: "Appetizer",
+  Dessert: "Dessert",
+};
+
+/* ---------- small style helpers ---------- */
+const styles = {
+  ...baseStyles,
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  primaryBtn: {
+    backgroundColor: "#111827",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  primaryText: { color: "#fff", fontWeight: "700" },
+  ghostBtn: {
+    backgroundColor: "#e5e7eb",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  ghostText: { color: "#111827", fontWeight: "600" },
+  modalSheet: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: "90%",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    justifyContent: "flex-end",
+  },
+  selectInput: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  selectPlaceholder: { color: "#9ca3af" },
+  selectValue: { color: "#111827", fontWeight: "600" },
+  optRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  dangerBtn: {
+    backgroundColor: "#fee2e2",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  dangerText: { color: "#b91c1c", fontWeight: "700" },
+  fieldWrap: {
+    marginBottom: 12,
+  },
+  fieldLabelNice: {
+    color: "#111827",
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  fieldBox: {
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  fieldBoxFocused: {
+    borderColor: "#111827",
+  },
+  inputNice: {
+    fontSize: 16,
+    color: "#111827",
+  },
+  textareaNice: {
+    fontSize: 16,
+    color: "#111827",
+    minHeight: 96,
+    textAlignVertical: "top",
+  },
+  selectBox: {
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  selectBoxFocused: {
+    borderColor: "#111827",
+  },
+  selectValueNice: { color: "#111827", fontWeight: "600", fontSize: 16 },
+  selectPlaceholderNice: { color: "#9ca3af", fontSize: 16 },
+  chevron: { marginLeft: 8, opacity: 0.5, fontSize: 16 },
+};
+
+/* ---------- utils ---------- */
 const toErr = (e, fallback = "เกิดข้อผิดพลาด") => {
   const status = e?.response?.status ?? null;
   const message =
@@ -44,11 +179,94 @@ const normalizeShop = (s) =>
       }
     : s;
 
+/* ---------- image helpers ---------- */
+function guessMimeFromUri(uri = "") {
+  const lower = uri.split("?")[0].toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/heic";
+  return "image/jpeg";
+}
+
+async function uriToBase64(uri) {
+  try {
+    return await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  } catch {
+    const filename =
+      uri.split("/").pop()?.split("?")[0] || `picked_${Date.now()}.jpg`;
+    const dest = FileSystem.cacheDirectory + filename;
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    return await FileSystem.readAsStringAsync(dest, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  }
+}
+
+async function ensureBase64(image) {
+  if (!image) return { base64: null, passthroughUrl: null };
+  if (/^https?:\/\//i.test(image)) {
+    return { base64: null, passthroughUrl: image };
+  }
+  if (/^data:/i.test(image)) {
+    const b64 = image.split(",")[1] || "";
+    return { base64: b64, passthroughUrl: null };
+  }
+  const b64 = await uriToBase64(image);
+  return { base64: b64, passthroughUrl: null };
+}
+
+async function uploadToImgbb(base64) {
+  const key =
+    process.env.EXPO_PUBLIC_IMGBB_KEY ||
+    (Constants?.expoConfig?.extra?.imgbbKey ?? "");
+  if (!key) throw new Error("ยังไม่ได้ตั้งค่า IMGBB KEY");
+
+  const fd = new FormData();
+  fd.append("key", key);
+  fd.append("image", base64);
+
+  const resp = await fetch("https://api.imgbb.com/1/upload", {
+    method: "POST",
+    body: fd,
+  });
+  const json = await resp.json();
+  if (!json?.success) {
+    const msg =
+      json?.error?.message ||
+      json?.data?.error?.message ||
+      "อัปโหลดรูปไป imgbb ไม่สำเร็จ";
+    throw new Error(msg);
+  }
+  return json?.data?.display_url || json?.data?.url;
+}
+
 export default function HomeShop() {
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState({ shop: false, order: false, reserve: false });
+  const [saving, setSaving] = useState({
+    shop: false,
+    order: false,
+    reserve: false,
+  });
   const [err, setErr] = useState(null);
+
+  // edit modal
+  const [openEdit, setOpenEdit] = useState(false);
+  const [edit, setEdit] = useState({
+    shop_name: "",
+    description: "",
+    type: "",
+    image: "",
+  });
+  const [localImg, setLocalImg] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+
+  // ✅ ตัวเปิด/ปิดรายการประเภท (แก้ error setTypePickerOpen)
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
 
   const fetchShop = useCallback(async () => {
     try {
@@ -72,26 +290,23 @@ export default function HomeShop() {
     fetchShop();
   }, [fetchShop]);
 
- const updateShopPartial = useCallback(
-  async (patch) => {
-    const id = shop?.ID || shop?.id || SHOP_ID;
-    await api.put(`/shop/${id}/update`, patch);
-    setShop((prev) => (prev ? { ...prev, ...patch } : prev));
-  },
-  [shop]
-);
+  const updateShopPartial = useCallback(
+    async (patch) => {
+      const id = shop?.ID || shop?.id || SHOP_ID;
+      await api.put(`/shop/${id}/update`, patch);
+      setShop((prev) => (prev ? { ...prev, ...patch } : prev));
+    },
+    [shop]
+  );
 
   const isOpen = (shop?.status || STATUS_OPEN) === STATUS_OPEN;
 
   const onToggleShop = async (val) => {
-    // val = true => เปิดร้าน, false => ปิดร้าน
     try {
       setSaving((s) => ({ ...s, shop: true }));
       if (val) {
-        // เปิดร้าน: เปลี่ยนเฉพาะ status เป็น open (ไม่ไปยุ่งกับสวิตช์อื่น)
         await updateShopPartial({ status: STATUS_OPEN });
       } else {
-        // ปิดร้าน: ปิดรับออเดอร์และรับการจองด้วย เพื่อความสอดคล้อง
         await updateShopPartial({
           status: STATUS_CLOSED,
           order_active: false,
@@ -156,9 +371,100 @@ export default function HomeShop() {
       ? String(shop.image)
       : null;
 
+  /* ---------- open edit modal ---------- */
+  const openEditModal = () => {
+    setEdit({
+      shop_name: String(shop?.shop_name || shop?.name || ""),
+      description: String(shop?.description || ""),
+      type: String(shop?.type || ""),
+      image: String(shop?.image || ""),
+    });
+    setLocalImg(String(shop?.image || ""));
+    setTypePickerOpen(false); // reset
+    setOpenEdit(true);
+  };
+
+  /* ---------- image pick inside edit modal ---------- */
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("ต้องการสิทธิ์", "กรุณาอนุญาตเข้าถึงคลังภาพ");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      base64: true,
+    });
+    if (!result.canceled) {
+      const a = result.assets[0];
+      if (a.base64) {
+        const mime = a.mimeType || guessMimeFromUri(a.uri);
+        const dataUrl = `data:${mime};base64,${a.base64}`;
+        setLocalImg(dataUrl);
+        setEdit((s) => ({ ...s, image: dataUrl }));
+      } else if (a.uri) {
+        setLocalImg(a.uri);
+        setEdit((s) => ({ ...s, image: a.uri }));
+      }
+    }
+  };
+
+  /* ---------- save edit ---------- */
+  const onSaveEdit = async () => {
+    if (!edit.shop_name.trim()) {
+      Alert.alert("กรอกไม่ครบ", "กรุณากรอกชื่อร้าน");
+      return;
+    }
+    if (!edit.type) {
+      Alert.alert("กรอกไม่ครบ", "กรุณาเลือกประเภท");
+      return;
+    }
+
+    try {
+      setSubmittingEdit(true);
+
+      // อัปโหลดรูป (ถ้าไม่ใช่ URL)
+      let imageUrl = "";
+      const { base64, passthroughUrl } = await ensureBase64(edit.image);
+      if (passthroughUrl) imageUrl = passthroughUrl;
+      else if (base64) {
+        setUploadingImage(true);
+        imageUrl = await uploadToImgbb(base64);
+      }
+
+      const patch = {
+        shop_name: edit.shop_name.trim(),
+        description: edit.description.trim(),
+        type: edit.type, // ต้องเป็นค่าจาก TYPES ข้างบนเท่านั้น
+        image: imageUrl || "",
+      };
+      const id = shop?.ID || shop?.id || SHOP_ID;
+
+      // optimistic UI
+      setShop((prev) => (prev ? { ...prev, ...patch } : prev));
+      await api.put(`/shop/${id}/update`, patch);
+
+      setOpenEdit(false);
+      await fetchShop();
+    } catch (e) {
+      const er = toErr(e, "อัปเดตร้านไม่สำเร็จ");
+      Alert.alert(
+        `อัปเดตไม่สำเร็จ${er.status ? ` (HTTP ${er.status})` : ""}`,
+        er.message
+      );
+    } finally {
+      setSubmittingEdit(false);
+      setUploadingImage(false);
+    }
+  };
+
+  /* ---------- renders ---------- */
+
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={baseStyles.center}>
         <ActivityIndicator size="large" />
         <Text style={{ marginTop: 8 }}>กำลังโหลดข้อมูล…</Text>
       </View>
@@ -167,21 +473,23 @@ export default function HomeShop() {
 
   if (err && !shop) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.title}>ร้านของฉัน</Text>
-        {!!err?.status && <Text style={styles.error}>HTTP {err.status}</Text>}
-        <Text style={styles.error}>{err?.message}</Text>
-        <Pressable onPress={fetchShop} style={styles.retryBtn}>
-          <Text style={styles.retryText}>ลองใหม่</Text>
+      <View style={baseStyles.center}>
+        <Text style={baseStyles.title}>ร้านของฉัน</Text>
+        {!!err?.status && (
+          <Text style={baseStyles.error}>HTTP {err.status}</Text>
+        )}
+        <Text style={baseStyles.error}>{err?.message}</Text>
+        <Pressable onPress={fetchShop} style={baseStyles.retryBtn}>
+          <Text style={baseStyles.retryText}>ลองใหม่</Text>
         </Pressable>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-      <StatusBar></StatusBar>
-      <View style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <StatusBar style="dark" />
+      <View style={baseStyles.container}>
         {shopImg ? (
           <Image
             source={{ uri: shopImg }}
@@ -189,63 +497,66 @@ export default function HomeShop() {
             resizeMode="cover"
           />
         ) : (
-          <View style={[styles.noImage, { height: 200, borderRadius: 12 }]}>
+          <View style={[baseStyles.noImage, { height: 200, borderRadius: 12 }]}>
             <Text style={{ color: "#9ca3af" }}>ไม่มีรูปภาพ</Text>
           </View>
         )}
 
-        <Text style={styles.title}>ร้านของฉัน</Text>
+        <View style={styles.headerRow}>
+          <Text style={baseStyles.title}>ร้านของฉัน</Text>
+          <Pressable onPress={openEditModal} style={styles.primaryBtn}>
+            <Text style={styles.primaryText}>แก้ไขร้าน</Text>
+          </Pressable>
+        </View>
 
-        <View style={styles.card}>
-          {/* แถว: ชื่อร้าน */}
-          <View className="row" style={styles.row}>
-            <Text style={styles.label}>ชื่อร้าน</Text>
-            <Text style={styles.value}>{shopName}</Text>
+        <View style={baseStyles.card}>
+          {/* ชื่อร้าน */}
+          <View style={baseStyles.row}>
+            <Text style={baseStyles.label}>ชื่อร้าน</Text>
+            <Text style={baseStyles.value}>{shopName}</Text>
           </View>
 
-          {/* แถว: สถานะร้าน (open/closed) */}
-          <View style={styles.row}>
-            <View style={styles.left}>
-              <Text style={styles.label}>สถานะร้าน</Text>
+          {/* สถานะร้าน */}
+          <View style={baseStyles.row}>
+            <View style={baseStyles.left}>
+              <Text style={baseStyles.label}>สถานะร้าน</Text>
               <Text
                 style={[
-                  styles.badge,
+                  baseStyles.badge,
                   { backgroundColor: isOpen ? "#16a34a" : "#ef4444" },
                 ]}
               >
                 {isOpen ? "เปิด" : "ปิด"}
               </Text>
             </View>
-            <View style={styles.right}>
+            <View style={baseStyles.right}>
               {saving.shop ? (
                 <ActivityIndicator />
               ) : (
-                <Switch
-                  value={isOpen}
-                  onValueChange={onToggleShop}
-                />
+                <Switch value={isOpen} onValueChange={onToggleShop} />
               )}
             </View>
           </View>
 
-          {/* แถว: รับออเดอร์ */}
-          <View style={styles.row}>
-            <View style={styles.left}>
-              <Text style={styles.label}>รับออเดอร์</Text>
+          {/* รับออเดอร์ */}
+          <View style={baseStyles.row}>
+            <View style={baseStyles.left}>
+              <Text style={baseStyles.label}>รับออเดอร์</Text>
               <Text
                 style={[
-                  styles.badge,
+                  baseStyles.badge,
                   {
-                    backgroundColor: toBool(shop?.order_active) && isOpen
-                      ? "#16a34a"
-                      : "#9ca3af",
+                    backgroundColor:
+                      toBool(shop?.order_active) && isOpen
+                        ? "#16a34a"
+                        : "#9ca3af",
                   },
                 ]}
               >
                 {toBool(shop?.order_active) && isOpen ? "เปิด" : "ปิด"}
               </Text>
             </View>
-            <View style={styles.right}>
+            <View style={baseStyles.right}>
               {saving.order ? (
                 <ActivityIndicator />
               ) : (
@@ -258,24 +569,25 @@ export default function HomeShop() {
             </View>
           </View>
 
-          {/* แถว: รับการจอง */}
-          <View style={styles.row}>
-            <View style={styles.left}>
-              <Text style={styles.label}>รับการจอง</Text>
+          {/* รับการจอง */}
+          <View style={baseStyles.row}>
+            <View style={baseStyles.left}>
+              <Text style={baseStyles.label}>รับการจอง</Text>
               <Text
                 style={[
-                  styles.badge,
+                  baseStyles.badge,
                   {
-                    backgroundColor: toBool(shop?.reserve_active) && isOpen
-                      ? "#6d28d9"
-                      : "#9ca3af",
+                    backgroundColor:
+                      toBool(shop?.reserve_active) && isOpen
+                        ? "#6d28d9"
+                        : "#9ca3af",
                   },
                 ]}
               >
                 {toBool(shop?.reserve_active) && isOpen ? "เปิด" : "ปิด"}
               </Text>
             </View>
-            <View style={styles.right}>
+            <View style={baseStyles.right}>
               {saving.reserve ? (
                 <ActivityIndicator />
               ) : (
@@ -287,16 +599,235 @@ export default function HomeShop() {
               )}
             </View>
           </View>
-
+          <View style={baseStyles.row}>
+            <View style={baseStyles.left}>
+              <Text style={baseStyles.label}>ประเภท: {shop?.type}</Text>
+            </View>
+          </View>
           {!!err && (
-            <Text style={[styles.error, { marginTop: 12 }]}>
+            <Text style={[baseStyles.error, { marginTop: 12 }]}>
               {err.status ? `HTTP ${err.status}: ` : ""}
               {err.message}
             </Text>
           )}
-
         </View>
       </View>
+
+      {/* โมดัลแก้ไขร้าน */}
+      <Modal
+        transparent
+        visible={openEdit}
+        animationType="slide"
+        onRequestClose={() => setOpenEdit(false)}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalSheet}>
+              <Text
+                style={{ fontSize: 18, fontWeight: "800", marginBottom: 12 }}
+              >
+                แก้ไขข้อมูลร้าน
+              </Text>
+
+              <ScrollView keyboardShouldPersistTaps="handled">
+                {/* รูป */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  {localImg ? (
+                    <Image
+                      source={{ uri: localImg }}
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 12,
+                        backgroundColor: "#e5e7eb",
+                      }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 12,
+                        backgroundColor: "#e5e7eb",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ color: "#9ca3af", fontSize: 12 }}>
+                        ไม่มีรูป
+                      </Text>
+                    </View>
+                  )}
+                  <Pressable
+                    onPress={pickImage}
+                    style={[
+                      styles.primaryBtn,
+                      { marginLeft: 12, opacity: uploadingImage ? 0.7 : 1 },
+                    ]}
+                    disabled={uploadingImage}
+                  >
+                    <Text style={styles.primaryText}>
+                      {uploadingImage ? "กำลังอัปโหลด…" : "เปลี่ยนรูป"}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* ชื่อร้าน */}
+                <View style={styles.fieldWrap}>
+                  <Text style={styles.fieldLabelNice}>ชื่อร้าน *</Text>
+                  <View
+                    style={[
+                      styles.fieldBox,
+                      edit._nameFocus && styles.fieldBoxFocused,
+                    ]}
+                  >
+                    <TextInput
+                      value={edit.shop_name}
+                      onChangeText={(t) =>
+                        setEdit((s) => ({ ...s, shop_name: t }))
+                      }
+                      placeholder="เช่น Fin Café"
+                      placeholderTextColor="#9ca3af"
+                      style={styles.inputNice}
+                      onFocus={() =>
+                        setEdit((s) => ({ ...s, _nameFocus: true }))
+                      }
+                      onBlur={() =>
+                        setEdit((s) => ({ ...s, _nameFocus: false }))
+                      }
+                      returnKeyType="done"
+                    />
+                  </View>
+                </View>
+
+                {/* คำอธิบาย */}
+                <View style={styles.fieldWrap}>
+                  <Text style={styles.fieldLabelNice}>คำอธิบาย</Text>
+                  <View
+                    style={[
+                      styles.fieldBox,
+                      edit._descFocus && styles.fieldBoxFocused,
+                    ]}
+                  >
+                    <TextInput
+                      value={edit.description}
+                      onChangeText={(t) =>
+                        setEdit((s) => ({ ...s, description: t }))
+                      }
+                      placeholder="รายละเอียดร้าน"
+                      placeholderTextColor="#9ca3af"
+                      style={styles.textareaNice}
+                      multiline
+                      onFocus={() =>
+                        setEdit((s) => ({ ...s, _descFocus: true }))
+                      }
+                      onBlur={() =>
+                        setEdit((s) => ({ ...s, _descFocus: false }))
+                      }
+                    />
+                  </View>
+                </View>
+
+                {/* ประเภท */}
+                <View style={styles.fieldWrap}>
+                  <Text style={styles.fieldLabelNice}>ประเภท *</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.selectBox,
+                      typePickerOpen && styles.selectBoxFocused,
+                    ]}
+                    onPress={() => setTypePickerOpen((v) => !v)}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={
+                        edit.type
+                          ? styles.selectValueNice
+                          : styles.selectPlaceholderNice
+                      }
+                    >
+                      {edit.type
+                        ? TYPE_LABEL[edit.type] || edit.type
+                        : "— เลือกประเภท —"}
+                    </Text>
+                    <Text style={styles.chevron}>▼</Text>
+                  </TouchableOpacity>
+
+                  {/* รายการประเภท (โชว์เมื่อกด) */}
+                  {typePickerOpen && (
+                    <View
+                      style={{
+                        borderWidth: 1.5,
+                        borderColor: "#e5e7eb",
+                        borderRadius: 12,
+                        marginTop: 8,
+                        overflow: "hidden",
+                        backgroundColor: "#fff",
+                        shadowColor: "#000",
+                        shadowOpacity: 0.04,
+                        shadowRadius: 6,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: 2,
+                      }}
+                    >
+                      {TYPES.map((t, idx) => (
+                        <TouchableOpacity
+                          key={t}
+                          style={[styles.optRow, { paddingHorizontal: 14 }]}
+                          onPress={() => {
+                            setEdit((s) => ({ ...s, type: t }));
+                            setTypePickerOpen(false);
+                          }}
+                          activeOpacity={0.9}
+                        >
+                          <Text style={{ color: "#111827", fontSize: 16 }}>
+                            {TYPE_LABEL[t] || t}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                {/* ปุ่มล่าง */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    marginTop: 18,
+                  }}
+                >
+                  <Pressable
+                    onPress={() => setOpenEdit(false)}
+                    style={[styles.ghostBtn, { marginRight: 8 }]}
+                    disabled={submittingEdit || uploadingImage}
+                  >
+                    <Text style={styles.ghostText}>ยกเลิก</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onSaveEdit}
+                    style={[
+                      styles.primaryBtn,
+                      { opacity: submittingEdit || uploadingImage ? 0.7 : 1 },
+                    ]}
+                    disabled={submittingEdit || uploadingImage}
+                  >
+                    <Text style={styles.primaryText}>
+                      {submittingEdit ? "กำลังบันทึก…" : "บันทึก"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
