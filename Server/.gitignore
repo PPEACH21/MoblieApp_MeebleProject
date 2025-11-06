@@ -1,1 +1,2 @@
-.env*.local
+.env
+meeble-project-firebaseKey.json
