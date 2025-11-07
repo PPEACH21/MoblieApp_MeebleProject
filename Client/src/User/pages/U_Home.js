@@ -8,8 +8,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseColor as c } from "../../components/Color";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api } from "../../api/axios";
+import api from "../../api/axios"; // ✅ ใช้ตัวที่มี interceptor
 
 const CHIP_H = 34;
 
@@ -25,30 +24,17 @@ const U_Home = () => {
   const [type, setType] = useState("all");
   const [typePickerVisible, setTypePickerVisible] = useState(false);
 
-  // ✅ ต้อง return state.auth
+  // ✅ ต้อง return state.auth (ของเดิมพิมพ์ตก)
   const auth = useSelector((state) => state.auth);
 
-  // ✅ ดึงร้าน (แนบ Bearer ที่นี่เลย)
+  // ✅ ดึงร้าน (แนบ Bearer ให้อัตโนมัติแล้วจาก interceptor)
   const fetchShops = useCallback(async () => {
     try {
       setLoading(true);
 
-      // 1) เตรียม Bearer token จาก Redux → AsyncStorage (เผื่อ Redux ยังไม่ทัน)
-      let token = auth?.token ?? null;
-      if (!token) {
-        try {
-          const stored = await AsyncStorage.getItem("token");
-          if (stored) token = stored;
-        } catch {}
-      }
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      // debug สั้น ๆ (ไม่โชว์ทั้ง token)
-      console.log("[U_Home] call /shops with bearer?", !!token);
-
-      // 2) ลองหลาย endpoint ตามหลังบ้าน
+      // ลองหลาย endpoint เผื่อโครงหลังบ้านต่างกัน
       const endpoints = ["/shops", "/shop/list", "/shop", "/api/shops"];
 
-      // 3) ช่วยแงะทรงข้อมูล
       const pickListFrom = (data) => {
         if (Array.isArray(data?.shops)) return data.shops;
         if (Array.isArray(data?.items)) return data.items;
@@ -59,7 +45,6 @@ const U_Home = () => {
         return [];
       };
 
-      // 4) normalize ให้ใช้ต่อหน้า UI ได้เลย
       const normalize = (raw) => ({
         id: raw?.id ?? raw?.shop_id ?? raw?.shopId ?? raw?.docId ?? raw?._id ?? null,
         shop_name: raw?.shop_name ?? raw?.name ?? "ร้านไม่มีชื่อ",
@@ -82,14 +67,12 @@ const U_Home = () => {
 
       for (const url of endpoints) {
         try {
-          // ⬇⬇⬇ แนบ token “ในหน้านี้” ชัดเจน
-          const res = await api.get(url, { headers, params: { _ts: Date.now() } });
-          const raw = res?.data ?? null;
-          const picked = pickListFrom(raw);
+          const res = await api.get(url, { params: { _ts: Date.now() } });
+          const picked = pickListFrom(res?.data ?? null);
           if (Array.isArray(picked)) {
             list = picked.map(normalize).filter((x) => x && x.id);
             console.log("[U_Home] fetched from", url, "count:", list.length);
-            break; // สำเร็จแล้วหยุด
+            break;
           }
         } catch (e) {
           lastErr = e;
@@ -98,16 +81,19 @@ const U_Home = () => {
 
       setShops(list);
 
-      // 5) ถ้า 401 ให้ล้าง token และรีเซ็ตไป Splash
+      // 401 -> token หมดอายุ/ไม่ถูกต้อง
       if (!list.length && lastErr?.response?.status === 401) {
-        console.warn("[U_Home] 401 — token invalid/expired, go Splash");
-        try { await AsyncStorage.removeItem("token"); } catch {}
+        console.warn("[U_Home] 401 /shops — token invalid, go Splash");
         navigation.reset({ index: 0, routes: [{ name: "Splash" }] });
         return;
       }
 
       if (!list.length && lastErr) {
-        console.warn("[U_Home] load shops error:", lastErr?.response?.status, lastErr?.message);
+        console.warn(
+          "[U_Home] load shops error:",
+          lastErr?.response?.status,
+          lastErr?.message
+        );
       }
     } catch (err) {
       console.warn("โหลดร้านไม่สำเร็จ:", err?.message);
@@ -115,9 +101,8 @@ const U_Home = () => {
     } finally {
       setLoading(false);
     }
-  }, [auth?.token, navigation]);
+  }, [navigation]);
 
-  // ✅ ยิงครั้งแรก
   useEffect(() => { fetchShops(); }, [fetchShops]);
 
   const onRefresh = async () => {
@@ -126,14 +111,12 @@ const U_Home = () => {
     setRefreshing(false);
   };
 
-  // ประเภทจากข้อมูลจริง
   const typeOptions = useMemo(() => {
     const s = new Set();
     (shops || []).forEach((it) => it?.type && s.add(String(it.type)));
     return ["all", ...Array.from(s)];
   }, [shops]);
 
-  // กรอง
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (shops || []).filter((it) => {
@@ -150,7 +133,6 @@ const U_Home = () => {
     });
   }, [shops, query, onlyOpen, type]);
 
-  // การ์ด
   const renderShop = ({ item }) => {
     const s = (item.status || "").toLowerCase();
     const isOpen = s === "open" || s === "active";
@@ -166,7 +148,7 @@ const U_Home = () => {
         <View style={styles.imageWrap}>
           <Image
             source={{
-              uri: item.image?.startsWith("http")
+              uri: item.image?.startsWith?.("http")
                 ? item.image
                 : "https://sandermechanical.com/wp-content/uploads/2016/02/shop-placeholder-300x300.png",
             }}
@@ -235,7 +217,6 @@ const U_Home = () => {
 
       {/* 🔘 Toggles */}
       <View style={styles.togglesRow}>
-        {/* เปิดอยู่ */}
         <Pressable
           onPress={() => setOnlyOpen((v) => !v)}
           style={[
@@ -256,7 +237,6 @@ const U_Home = () => {
           </Text>
         </Pressable>
 
-        {/* เลือกประเภท — ข้อความล้วน */}
         <Pressable
           onPress={() => setTypePickerVisible(true)}
           style={[styles.typeSelector, { flex: 1 }]}
@@ -350,7 +330,6 @@ const styles = StyleSheet.create({
     fontSize: 22, fontWeight: "700", color: c.black,
     marginTop: 10, marginLeft: 16, marginBottom: 6,
   },
-  /* Search */
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -365,7 +344,6 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, paddingHorizontal: 8, color: c.black },
   clearBtn: { paddingLeft: 6, paddingVertical: 4 },
-  /* Toggles */
   togglesRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -398,7 +376,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   typeSelectorTxt: { flex: 1, color: c.black, fontWeight: "700", fontSize: 12 },
-  /* Card */
   card: {
     backgroundColor: c.white,
     borderRadius: 14,
@@ -431,15 +408,8 @@ const styles = StyleSheet.create({
   type: { color: c.S5, fontWeight: "500" },
   price: { color: c.S2, fontWeight: "600" },
   emptyText: { textAlign: "center", color: c.S5, marginTop: 30 },
-  /* Modal */
-  modalRoot: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "flex-end",
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.25)",
-  },
+  modalRoot: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.25)" },
   modalSheet: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -456,9 +426,6 @@ const styles = StyleSheet.create({
     backgroundColor: c.fullwhite,
   },
   typeRowTxt: { color: c.black, fontWeight: "600", fontSize: 13 },
-  modalClose: {
-    marginTop: 10, alignSelf: "flex-end", paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 10, backgroundColor: c.S2,
-  },
+  modalClose: { marginTop: 10, alignSelf: "flex-end", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: c.S2 },
   modalCloseTxt: { color: c.fullwhite, fontWeight: "800" },
 });
