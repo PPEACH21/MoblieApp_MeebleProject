@@ -7,20 +7,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/redux/store.js';
 
-// i18n (Paraglide)
-import { getLocale, setLocale } from "./paraglide/runtime.js";
-import { m } from "./paraglide/messages.js";
-
 export default function App() {
   const [language, setLaguage] = useState(getLocale());
-  enableScreens(false);
   const toggleLanguage = () => {
     const newLang = language === "th" ? "en" : "th";
     setLocale(newLang);
     setLaguage(newLang);
   };
-const Stack = createNativeStackNavigator();
-
   return (
     <Provider store={store}>
       <SafeAreaView style={{flex:1}}>
@@ -35,9 +28,3 @@ const Stack = createNativeStackNavigator();
     </Provider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});

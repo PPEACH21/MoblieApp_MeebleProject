@@ -41,14 +41,13 @@ const Splash = ({ navigation }) => {
     useEffect(() => {
     if (Auth.user) {
         console.log("USER:", Auth.user);
-        Dispath(getProfile); 
+        // Dispath(getProfile()); 
         CheckAuth(); 
     }
     }, [Auth.user]);
     //AUTH TEST
 
     //AnimationSet
-    const keyboard = useAnimatedKeyboard();
     const yOpen = useSharedValue(0);
     const xOpen = useSharedValue(0);
     const scOpen = useSharedValue(20);
@@ -207,7 +206,9 @@ const Splash = ({ navigation }) => {
             Password: "",
             ConfirmPassword: "",
         }),
-        setErrmsg("")
+        setErrmsg(""),
+        setRolesetup("user"),
+        setChooseRole(false)
         )
     }, [login]);
 
@@ -306,8 +307,15 @@ const Splash = ({ navigation }) => {
             Email:registerinput.Email,
             Username:registerinput.Username,
             Password:registerinput.Password,
-        }))
+        },{role:Rolesetup}))
     }
+    //validation
+
+
+    // Register State
+    const [Rolesetup,setRolesetup] = useState("user");
+    const [chooseRole,setChooseRole] = useState(false)
+    // Register State
 
     useEffect(() => {
         if (!login || Auth.loading) return;
@@ -470,12 +478,29 @@ const Splash = ({ navigation }) => {
 
             </Animated.View>
             <Animated.View style={[{ position: "absolute", width: '80%' }, RegisterTrigger]}>
-                <View
-                    style={[
-                        Layout.centerset,
-                        { gap: 13, justifyContent: "space-between" },
-                    ]}
-                >
+                    {!chooseRole?
+                        <View style={[Layout.columset]}>
+                            <TouchableOpacity
+                                style={[Btn.Btn1, { width: 200,height:200 }]}
+                                onPress={()=>{setRolesetup("user");setChooseRole(true)}}
+                            >
+                                <Text style={[{ textAlign: 'center',justifyContent:'center'},Btn.textBtn1]}>USER</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[Btn.Btn1, { width: 200,height:200 }]}
+                                onPress={()=>{setRolesetup("vendor");setChooseRole(true)}}
+                            >
+                                <Text style={[{ textAlign: 'center',justifyContent:'center'},Btn.textBtn1]}>VENDOR</Text>
+                            </TouchableOpacity>
+                        </View>
+                    :
+                    <View
+                        style={[
+                            Layout.centerset,
+                            { gap: 13, justifyContent: "space-between" },
+                        ]}
+                    >
+
                     <TextInputSplash name={"Email"} setvalue={(text) => setRegisterinput({ ...registerinput, Email: text })} value={registerinput.Email} />
                     <TextInputSplash name={"Username"} setvalue={(text) => setRegisterinput({ ...registerinput, Username: text })} value={registerinput.Username} />
                     <TextInputSplash name={"Password"} setvalue={(text) => setRegisterinput({ ...registerinput, Password: text })} value={registerinput.Password} />
@@ -488,7 +513,8 @@ const Splash = ({ navigation }) => {
                         <Text style={{ textAlign: 'center' }}>SignIn</Text>
                     </TouchableOpacity>
                     <Text>You dont have user</Text>
-                </View>
+                    </View>
+                    }
             </Animated.View>
             {Auth.loading&&(<Loading/>)}
         </SafeAreaView>
