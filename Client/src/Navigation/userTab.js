@@ -85,12 +85,6 @@ export default function UserTabs({ initialRouteName = "Home" }) {
       />
 
       <Tab.Screen
-        name="Reservations"
-        component={UserReserveScreen}
-        options={{ title: "การจอง" }}
-      />
-
-      <Tab.Screen
         name="Settings"
         component={UserSettingScreen}
         options={{ title: "ตั้งค่า" }}

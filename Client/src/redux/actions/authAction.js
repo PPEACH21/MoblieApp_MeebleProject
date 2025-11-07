@@ -1,7 +1,6 @@
 // src/redux/actions/authActions.js
 import axios from "../../api/axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loginStart,loginFailed,loginSuccess } from "../slices/authSlice";
 import { API_BASE } from "../../axios";
 
     const API_URL = API_BASE; 

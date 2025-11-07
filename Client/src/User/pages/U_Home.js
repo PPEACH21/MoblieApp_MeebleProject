@@ -5,9 +5,11 @@ import {
   ActivityIndicator, StyleSheet, Platform, Modal, Pressable, TextInput
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseColor as c } from "../../components/Color";
-import { api } from "../../axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { api } from "../../api/axios";
 
 const CHIP_H = 34;
 
@@ -23,18 +25,99 @@ const U_Home = () => {
   const [type, setType] = useState("all");
   const [typePickerVisible, setTypePickerVisible] = useState(false);
 
+  // ✅ ต้อง return state.auth
+  const auth = useSelector((state) => state.auth);
+
+  // ✅ ดึงร้าน (แนบ Bearer ที่นี่เลย)
   const fetchShops = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/shops");
-      setShops(res.data?.shops || res.data || []);
+
+      // 1) เตรียม Bearer token จาก Redux → AsyncStorage (เผื่อ Redux ยังไม่ทัน)
+      let token = auth?.token ?? null;
+      if (!token) {
+        try {
+          const stored = await AsyncStorage.getItem("token");
+          if (stored) token = stored;
+        } catch {}
+      }
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      // debug สั้น ๆ (ไม่โชว์ทั้ง token)
+      console.log("[U_Home] call /shops with bearer?", !!token);
+
+      // 2) ลองหลาย endpoint ตามหลังบ้าน
+      const endpoints = ["/shops", "/shop/list", "/shop", "/api/shops"];
+
+      // 3) ช่วยแงะทรงข้อมูล
+      const pickListFrom = (data) => {
+        if (Array.isArray(data?.shops)) return data.shops;
+        if (Array.isArray(data?.items)) return data.items;
+        if (Array.isArray(data)) return data;
+        if (data && typeof data === "object") {
+          return Object.entries(data).map(([id, v]) => ({ id, ...(v || {}) }));
+        }
+        return [];
+      };
+
+      // 4) normalize ให้ใช้ต่อหน้า UI ได้เลย
+      const normalize = (raw) => ({
+        id: raw?.id ?? raw?.shop_id ?? raw?.shopId ?? raw?.docId ?? raw?._id ?? null,
+        shop_name: raw?.shop_name ?? raw?.name ?? "ร้านไม่มีชื่อ",
+        description: raw?.description ?? "",
+        type: raw?.type ?? "ทั่วไป",
+        status:
+          typeof raw?.status === "string"
+            ? raw.status
+            : (raw?.state || raw?.is_open) ? "open" : "closed",
+        image:
+          raw?.image?.startsWith?.("http")
+            ? raw.image
+            : raw?.image || raw?.cover || raw?.thumbnail || null,
+        price_min: raw?.price_min ?? raw?.min_price ?? null,
+        price_max: raw?.price_max ?? raw?.max_price ?? null,
+      });
+
+      let list = [];
+      let lastErr = null;
+
+      for (const url of endpoints) {
+        try {
+          // ⬇⬇⬇ แนบ token “ในหน้านี้” ชัดเจน
+          const res = await api.get(url, { headers, params: { _ts: Date.now() } });
+          const raw = res?.data ?? null;
+          const picked = pickListFrom(raw);
+          if (Array.isArray(picked)) {
+            list = picked.map(normalize).filter((x) => x && x.id);
+            console.log("[U_Home] fetched from", url, "count:", list.length);
+            break; // สำเร็จแล้วหยุด
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      setShops(list);
+
+      // 5) ถ้า 401 ให้ล้าง token และรีเซ็ตไป Splash
+      if (!list.length && lastErr?.response?.status === 401) {
+        console.warn("[U_Home] 401 — token invalid/expired, go Splash");
+        try { await AsyncStorage.removeItem("token"); } catch {}
+        navigation.reset({ index: 0, routes: [{ name: "Splash" }] });
+        return;
+      }
+
+      if (!list.length && lastErr) {
+        console.warn("[U_Home] load shops error:", lastErr?.response?.status, lastErr?.message);
+      }
     } catch (err) {
-      console.log("โหลดร้านไม่สำเร็จ:", err);
+      console.warn("โหลดร้านไม่สำเร็จ:", err?.message);
+      setShops([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [auth?.token, navigation]);
 
+  // ✅ ยิงครั้งแรก
   useEffect(() => { fetchShops(); }, [fetchShops]);
 
   const onRefresh = async () => {
@@ -176,7 +259,7 @@ const U_Home = () => {
         {/* เลือกประเภท — ข้อความล้วน */}
         <Pressable
           onPress={() => setTypePickerVisible(true)}
-          style={[styles.typeSelector, { flex: 1 }]}  // ไม่เปลี่ยนสีตามที่ขอ
+          style={[styles.typeSelector, { flex: 1 }]}
           android_ripple={{ color: "#00000011" }}
         >
           <Ionicons name="restaurant" size={16} color={c.S5} style={{ marginRight: 6 }} />
@@ -204,7 +287,7 @@ const U_Home = () => {
         initialNumToRender={8}
       />
 
-      {/* 🔽 Modal เลือกประเภท (แก้ error: มี root เดียว + ทุกข้อความอยู่ใน <Text>) */}
+      {/* 🔽 Modal เลือกประเภท */}
       <Modal
         transparent
         visible={typePickerVisible}
@@ -267,7 +350,6 @@ const styles = StyleSheet.create({
     fontSize: 22, fontWeight: "700", color: c.black,
     marginTop: 10, marginLeft: 16, marginBottom: 6,
   },
-
   /* Search */
   searchRow: {
     flexDirection: "row",
@@ -283,7 +365,6 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, paddingHorizontal: 8, color: c.black },
   clearBtn: { paddingLeft: 6, paddingVertical: 4 },
-
   /* Toggles */
   togglesRow: {
     flexDirection: "row",
@@ -305,7 +386,6 @@ const styles = StyleSheet.create({
   toggleTxt: {
     color: c.black, fontWeight: "700", fontSize: 12, lineHeight: 16, includeFontPadding: false,
   },
-
   typeSelector: {
     flexDirection: "row",
     alignItems: "center",
@@ -318,7 +398,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   typeSelectorTxt: { flex: 1, color: c.black, fontWeight: "700", fontSize: 12 },
-
   /* Card */
   card: {
     backgroundColor: c.white,
@@ -338,7 +417,6 @@ const styles = StyleSheet.create({
   imageWrap: { position: "relative", width: "100%", height: 160, backgroundColor: c.S3 },
   image: { width: "100%", height: "100%" },
   dimOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.28)" },
-
   badgesRow: { position: "absolute", left: 10, bottom: 10, flexDirection: "row" },
   badge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, marginRight: 8, minHeight: 26, justifyContent: "center" },
   badgeOpen: { backgroundColor: "#dcfce7" },
@@ -346,16 +424,13 @@ const styles = StyleSheet.create({
   badgeTxt: { fontSize: 12, fontWeight: "800", lineHeight: 14, includeFontPadding: false },
   badgeTxtOpen: { color: "#166534" },
   badgeTxtClosed: { color: "#991b1b" },
-
   info: { padding: 12 },
   title: { fontSize: 16, fontWeight: "700", color: c.black },
   desc: { color: "#555", fontSize: 13, marginTop: 2 },
   meta: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
   type: { color: c.S5, fontWeight: "500" },
   price: { color: c.S2, fontWeight: "600" },
-
   emptyText: { textAlign: "center", color: c.S5, marginTop: 30 },
-
   /* Modal */
   modalRoot: {
     ...StyleSheet.absoluteFillObject,

@@ -41,7 +41,7 @@ const Splash = ({ navigation }) => {
     useEffect(() => {
     if (Auth.user) {
         console.log("USER:", Auth.user);
-        Dispath(getProfile); 
+        //Dispath(getProfile()); 
         CheckAuth(); 
     }
     }, [Auth.user]);
