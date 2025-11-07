@@ -30,9 +30,10 @@ func main(){
 	)
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: os.Getenv("FRONTEND_URL"),
-		AllowCredentials: true,
+		AllowOrigins: "*",
+		AllowCredentials: false,
 	}))
+
 
 	app.Use(logger.New(logger.Config{
 		Format:     "[${time}] ${status} - ${method} ${path}\n",
@@ -41,7 +42,9 @@ func main(){
 	}))
 
 	app.Post("/login",service.Login)
-	app.Use(middlewares.ProtectedCookie())
+	app.Post("/register",service.CreateUser)
+	app.Post("/checkotp", service.MathOTP)
+	app.Use(middlewares.ProtectedAuth())
 		routes.Routes(app)
 
 	fmt.Println("Local HTTP server running on Port:8080")
