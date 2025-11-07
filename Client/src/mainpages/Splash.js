@@ -16,33 +16,33 @@ import { BaseColor as c } from "../components/Color";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Btn } from "../components/Button";
 import { useDispatch,useSelector } from "react-redux";
-import { loginUser } from "../redux/actions/authAction";
+import { loginUser,registerID } from "../redux/actions/authAction";
 import { getProfile } from "../redux/actions/authAction";
 const Splash = ({ navigation }) => {
-
+    
+  
     //AUTH TEST
-    // const [auth, setAuth] = useState(false)
     const Dispath = useDispatch();
     const Auth = useSelector((state) => state.auth); 
     const CheckAuth =()=>{
         console.log("Loading Auth");
-        if (Auth.role==="user") {
+        if (!Auth.user || Auth.loading) return;
+
+        if (!Auth.verified){
+            navigation.replace("verifyotp")
+        }else if (Auth.role==="user") {
             navigation.replace("HomeUser")
-        }
-        if (Auth.role==="vendor") {
+        }else if (Auth.role==="vendor") {
             navigation.replace("HomeVendor")
         }
     }
 
 
     useEffect(() => {
-        setTimeout(() => {CheckAuth()}, 4000)
-    },[])
-
-    useEffect(() => {
     if (Auth.user) {
         console.log("USER:", Auth.user);
-        CheckAuth(); // เรียกหลัง login สำเร็จ
+        Dispath(getProfile); 
+        CheckAuth(); 
     }
     }, [Auth.user]);
     //AUTH TEST
@@ -281,31 +281,51 @@ const Splash = ({ navigation }) => {
         if(logininput.Username==="" || logininput.Password===""){
             return setErrmsg("your must fill information")
         }
-        
-        console.log(`Username: ${logininput.Username}`);
-        console.log(`Password: ${logininput.Password}`);
-        try{
-
-            await Dispath(loginUser({
-                Username:logininput.Username,
-                Password:logininput.Password,
-            }))
-            console.log(`user: ${Auth.user}`);
-            console.log("Login start triggered ✅");
-            
-        }catch(err){            
-            console.log("Login Fail ");
-        }
-
-        CheckAuth();
-        getProfile()
+        Dispath(loginUser({
+            Username:logininput.Username,
+            Password:logininput.Password,
+        }))
     }
     const SubmitRegister=()=>{
+        setErrmsg("")
+        if(registerinput.Email==="" || registerinput.Username==="" ||  registerinput.Password==="" || registerinput.ConfirmPassword===""){
+            return setErrmsg("your must fill information")
+        }
+        
+        if(registerinput.Password != registerinput.ConfirmPassword){
+            return setErrmsg("Password Not Match")
+        }
+        if(registerinput.Username.length<5){
+            return setErrmsg("User must be than 5 character")
+        }
+        if(registerinput.Password.length<8 && registerinput.Password.length<8){
+            return setErrmsg("password must be than 8")
+        }
 
-
+        Dispath(registerID({
+            Email:registerinput.Email,
+            Username:registerinput.Username,
+            Password:registerinput.Password,
+        }))
     }
-    //validation
 
+    useEffect(() => {
+        if (!login || Auth.loading) return;
+        if (Auth.error) {
+            setErrmsg("Login Fail: " + Auth.error);
+        } else if (Auth.user) {
+            CheckAuth(); 
+        }
+    }, [Auth.loading, Auth.error, Auth.user, login]);
+
+    useEffect(() => {
+    if (!register || Auth.loading) return;
+    if (Auth.error) {
+        setErrmsg("Register Fail: " + Auth.error);
+    } else if (Auth.user) {
+        navigation.navigate("verifyotp", { email: registerinput.Email });
+    }
+    }, [Auth.loading, Auth.error, Auth.user, register]);
     
     if(Auth.loading){
         return <Loading/>
@@ -380,7 +400,7 @@ const Splash = ({ navigation }) => {
                 </View>
 
                 <View style={[{ flex: 1 }]}>
-                    {Auth && (
+                    {!Auth.user && (
                         <View style={[Layout.centerset, Layout.rowset, { justifyContent: 'space-evenly' }]} >
                             <TouchableOpacity onPress={() => { 
                                 setRegister(true), 
@@ -463,7 +483,7 @@ const Splash = ({ navigation }) => {
                     {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
                     <TouchableOpacity
                         style={[Btn.Btn1, { width: '100%' }]}
-                        onPress={() => { setlogin(false), setRegister(false), setIsToggled(false); }}
+                        onPress={SubmitRegister}
                     >
                         <Text style={{ textAlign: 'center' }}>SignIn</Text>
                     </TouchableOpacity>
