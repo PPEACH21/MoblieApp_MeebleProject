@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRoute } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
@@ -88,9 +89,15 @@ function normalizeMenuResponse(data) {
 const getId = (it) => it?.id || it?.ID || it?._id || null;
 
 /* ---------- component ---------- */
-export default function MenuShop() {
+export default function MenuShop(props) {
   const route = useRoute();
-  const shopId = "qIcsHxOuL5uAtW4TwAeV";
+  const shopId =
+    route?.params?.shopId ??
+    props?.shopId ??
+    ""; // ← รับมาจาก AppTabs
+
+  const token = useSelector((s) => s?.auth?.token ?? "");
+  const reqHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -116,12 +123,25 @@ export default function MenuShop() {
     }
     try {
       setErr(null);
-      const { data } = await api.get(`/shop/${shopId}/menu`, {
-        withCredentials: true,
-        headers: { "Cache-Control": "no-cache" },
-        params: { _ts: Date.now() },
-      });
-      const list = normalizeMenuResponse(data);
+      setLoading(true);
+
+      // ลองเส้นทางใหม่ก่อน แล้ว fallback
+      let res;
+      try {
+        res = await api.get(`/shops/${shopId}/menu`, {
+          withCredentials: true,
+          headers: { "Cache-Control": "no-cache", ...reqHeaders },
+          params: { _ts: Date.now() },
+        });
+      } catch (e1) {
+        res = await api.get(`/shop/${shopId}/menu`, {
+          withCredentials: true,
+          headers: { "Cache-Control": "no-cache", ...reqHeaders },
+          params: { _ts: Date.now() },
+        });
+      }
+
+      const list = normalizeMenuResponse(res?.data);
       setItems(Array.isArray(list) ? list : []);
     } catch (e) {
       setErr(toErr(e, "โหลดเมนูไม่สำเร็จ"));
@@ -129,7 +149,7 @@ export default function MenuShop() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [shopId]);
+  }, [shopId, token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -183,11 +203,7 @@ export default function MenuShop() {
       `ต้องการลบ “${it?.name || it?.Name || "เมนูนี้"}” ใช่ไหม?`,
       [
         { text: "ยกเลิก", style: "cancel" },
-        {
-          text: "ลบ",
-          style: "destructive",
-          onPress: () => onDelete(id),
-        },
+        { text: "ลบ", style: "destructive", onPress: () => onDelete(id) },
       ]
     );
   };
@@ -197,9 +213,17 @@ export default function MenuShop() {
       // optimistic remove
       setItems((prev) => prev.filter((x) => getId(x) !== menuId));
 
-      await api.delete(`/shop/${shopId}/menu/${menuId}`, {
-        withCredentials: true,
-      });
+      try {
+        await api.delete(`/shops/${shopId}/menu/${menuId}`, {
+          withCredentials: true,
+          headers: reqHeaders,
+        });
+      } catch {
+        await api.delete(`/shop/${shopId}/menu/${menuId}`, {
+          withCredentials: true,
+          headers: reqHeaders,
+        });
+      }
 
       await fetchMenu();
     } catch (e) {
@@ -270,9 +294,18 @@ export default function MenuShop() {
       };
 
       if (mode === "create") {
-        const res = await api.post(`/shop/${shopId}/menu`, payload, {
-          withCredentials: true,
-        });
+        let res;
+        try {
+          res = await api.post(`/shops/${shopId}/menu`, payload, {
+            withCredentials: true,
+            headers: reqHeaders,
+          });
+        } catch {
+          res = await api.post(`/shop/${shopId}/menu`, payload, {
+            withCredentials: true,
+            headers: reqHeaders,
+          });
+        }
         const created =
           res?.data?.item || res?.data?.data || res?.data?.menuItem || res?.data || null;
         if (created && typeof created === "object") {
@@ -292,9 +325,18 @@ export default function MenuShop() {
           )
         );
 
-        const res = await api.put(`/shop/${shopId}/menu/${menuId}`, payload, {
-          withCredentials: true,
-        });
+        let res;
+        try {
+          res = await api.put(`/shops/${shopId}/menu/${menuId}`, payload, {
+            withCredentials: true,
+            headers: reqHeaders,
+          });
+        } catch {
+          res = await api.put(`/shop/${shopId}/menu/${menuId}`, payload, {
+            withCredentials: true,
+            headers: reqHeaders,
+          });
+        }
 
         const updated = res?.data?.item || res?.data?.data || res?.data || null;
         if (updated && typeof updated === "object") {
@@ -377,6 +419,18 @@ export default function MenuShop() {
       </Pressable>
     );
   };
+
+  if (!shopId) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.fullwhite }}>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Text style={{ color: c.red, textAlign: "center" }}>
+            ไม่พบ shopId — กรุณาเปิดผ่านเมนูที่ส่งค่า shopId มายังหน้านี้
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   /* ---------- UI ---------- */
   return (
@@ -597,7 +651,7 @@ export default function MenuShop() {
                           onPress={onSubmit}
                           style={{
                             paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
-                            backgroundColor: c.S5, // ส้มเข้มขึ้น
+                            backgroundColor: c.S5,
                             opacity: submitting || uploadingImage ? 0.7 : 1,
                           }}
                           disabled={submitting || uploadingImage}

@@ -2,8 +2,9 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loginStart,loginFailed,loginSuccess } from "../slices/authSlice";
+import { API_BASE } from "../../axios";
 
-    const API_URL = "http://10.130.198.204:8080"; 
+    const API_URL = API_BASE; 
 // หรือ "http://localhost:8080"
 
 

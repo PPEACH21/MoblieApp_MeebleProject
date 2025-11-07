@@ -2,7 +2,7 @@
 
 # dependencies
 node_modules/
-Client/package_lock.json
+**/package_lock.json
 **/meeble-project-firebaseKey.json
 # Expo
 .expo/

@@ -20,7 +20,6 @@ const U_Home = () => {
   // 🔎 ค้นหา + ท็อกเกิล
   const [query, setQuery] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(false);
-  const [onlyReservable, setOnlyReservable] = useState(false);
   const [type, setType] = useState("all");
   const [typePickerVisible, setTypePickerVisible] = useState(false);
 
@@ -57,18 +56,16 @@ const U_Home = () => {
     return (shops || []).filter((it) => {
       const status = (it.status || "").toLowerCase();
       const isOpen = status === "open" || status === "active";
-      const reservable = !!it.reserve_active;
 
       if (q) {
         const hay = `${it.shop_name || it.name || ""} ${it.description || ""} ${it.type || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (onlyOpen && !isOpen) return false;
-      if (onlyReservable && !reservable) return false;
       if (type !== "all" && String(it.type) !== type) return false;
       return true;
     });
-  }, [shops, query, onlyOpen, onlyReservable, type]);
+  }, [shops, query, onlyOpen, type]);
 
   // การ์ด
   const renderShop = ({ item }) => {
@@ -98,11 +95,6 @@ const U_Home = () => {
                 {isOpen ? "เปิดอยู่" : "ปิดอยู่"}
               </Text>
             </View>
-            {item.reserve_active && (
-              <View style={[styles.badge, { backgroundColor: c.blue }]}>
-                <Text style={[styles.badgeTxt, { color: c.fullwhite }]} allowFontScaling={false}>จองร้าน</Text>
-              </View>
-            )}
           </View>
           {isClosed && <View style={styles.dimOverlay} />}
         </View>
@@ -178,27 +170,6 @@ const U_Home = () => {
           />
           <Text style={[styles.toggleTxt, onlyOpen && { color: c.fullwhite }]} allowFontScaling={false}>
             เปิดอยู่
-          </Text>
-        </Pressable>
-
-        {/* จองได้ */}
-        <Pressable
-          onPress={() => setOnlyReservable((v) => !v)}
-          style={[
-            styles.togglePill,
-            onlyReservable && { backgroundColor: c.green, borderColor: c.green },
-          ]}
-          android_ripple={{ color: "#00000011" }}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          <Ionicons
-            name={onlyReservable ? "checkmark-circle" : "radio-button-off"}
-            size={16}
-            color={onlyReservable ? c.fullwhite : c.S5}
-            style={{ marginRight: 6 }}
-          />
-          <Text style={[styles.toggleTxt, onlyReservable && { color: c.fullwhite }]} allowFontScaling={false}>
-            จองได้
           </Text>
         </Pressable>
 

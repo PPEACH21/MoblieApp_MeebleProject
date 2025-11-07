@@ -15,14 +15,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
-
-func main(){
+func main() {
 	godotenv.Load("config/.env")
 	app := fiber.New()
-	
+
 	config.InitFirebase()
 	defer config.Client.Close()
-	
+
 	config.ConnectMailer(
 		os.Getenv("MAILER_HOST"),
 		os.Getenv("MAILER_USERNAME"),
@@ -30,8 +29,9 @@ func main(){
 	)
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: os.Getenv("FRONTEND_URL"),
-		AllowCredentials: true,
+		AllowOrigins: "*",
+		AllowHeaders: "Authorization, Content-Type",
+		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 	}))
 
 	app.Use(logger.New(logger.Config{
@@ -40,9 +40,9 @@ func main(){
 		TimeZone:   "Asia/Bangkok",
 	}))
 
-	app.Post("/login",service.Login)
+	app.Post("/login", service.Login)
 	app.Use(middlewares.ProtectedCookie())
-		routes.Routes(app)
+	routes.Routes(app)
 
 	fmt.Println("Local HTTP server running on Port:8080")
 	if err := app.Listen(":8080"); err != nil {

@@ -83,3 +83,9 @@ type UpdateMenuReq struct {
 	Price       *float64 `json:"price,omitempty"`
 	Active      *bool    `json:"active,omitempty"`
 }
+
+/* ---------- Address ---------- */
+type Address struct {
+	Latitude  float64 `json:"latitude" firestore:"latitude"`
+	Longitude float64 `json:"longitude" firestore:"longitude"`
+}

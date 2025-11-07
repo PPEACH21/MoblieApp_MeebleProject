@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Splash from './mainpages/Splash';
 import U_ButtonNav from './User/U_ButtonNav'
-import V_ButtonNav from './Vendor/V_ButtonNav';
+import V_ButtonNav from './vendor/V_ButtonNav';
 
 const StackNav =()=>{    
     const Stack = createNativeStackNavigator()

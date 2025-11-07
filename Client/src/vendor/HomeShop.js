@@ -1,4 +1,4 @@
-// src/Vendor/HomeShop.jsx (เวอร์ชันใช้ BaseColor เต็มรูปแบบ)
+// src/Vendor/HomeShop.jsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -7,12 +7,16 @@ import {
   StatusBar,
   ActivityIndicator,
   Pressable,
+  RefreshControl,     // ⬅️ เพิ่ม
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 import { BaseColor as c } from "../components/Color";
 import { api } from "../axios";
 
-const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
+/* ---------- DEBUG ---------- */
+const DEBUG = false;
 
 /* ---------- helpers ---------- */
 const toErr = (e, fallback = "เกิดข้อผิดพลาด") => {
@@ -26,7 +30,7 @@ const toErr = (e, fallback = "เกิดข้อผิดพลาด") => {
 };
 
 const toBool = (v) => v === true || v === "true" || v === 1 || v === "1";
-const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+const toNum  = (v) => (typeof v === "number" ? v : Number(v) || 0);
 const currencyTHB = (n) =>
   (Number(n) || 0).toLocaleString("th-TH", {
     style: "currency",
@@ -48,28 +52,41 @@ const normalizeShop = (s) =>
 const toDate = (v) => {
   if (!v) return null;
   if (typeof v === "object") {
-    if ("seconds" in v) return new Date(v.seconds * 1000);
-    if ("_seconds" in v) return new Date(v._seconds * 1000);
+    if ("seconds" in v)   return new Date(v.seconds * 1000);
+    if ("_seconds" in v)  return new Date(v._seconds * 1000);
   }
   const d = new Date(v);
   return isNaN(+d) ? null : d;
 };
 const isSameDayLocal = (a, b = new Date()) => {
   if (!a) return false;
-  const d1 = a, d2 = b;
   return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
   );
 };
 
-/* แปลง orders/reservations ให้เป็นรูปแบบที่อ่านง่าย */
+/* แปลง orders/reservations/history ให้เป็นรูปแบบที่อ่านง่าย */
 const normalizeOrders = (arr = []) =>
   arr.map((o) => ({
     id: o.id || o.orderId || Math.random().toString(36).slice(2),
     customer: o.customerName || o.customer || "ลูกค้า",
     status: (o.status || "").toString().toLowerCase(),
+    createdAt:
+      toDate(o.createdAt) ||
+      toDate(o.createAt) ||
+      toDate(o.created_at) ||
+      toDate(o.time) ||
+      null,
+    total: toNum(o.total ?? o.amount ?? o.price ?? 0),
+  }));
+
+const normalizeHistory = (arr = []) =>
+  arr.map((o) => ({
+    id: o.id || o.orderId || Math.random().toString(36).slice(2),
+    customer: o.customerName || o.customer || "ลูกค้า",
+    status: "done",
     createdAt:
       toDate(o.createdAt) ||
       toDate(o.createAt) ||
@@ -87,35 +104,27 @@ const normalizeReserves = (arr = []) =>
     startAt: toDate(r.startAt) || toDate(r.time) || toDate(r.createdAt) || null,
   }));
 
-/* นับเฉพาะสถานะที่ถือว่า “สำเร็จ/ชำระแล้ว” */
-const PAID_STATUSES = new Set([
-  "paid",
-  "success",
-  "completed",
-  "complete",
-  "done",
-  "delivered",
-  "finished",
-]);
-
-/* รวมยอดขาย */
-const sumSales = (orders = [], { onlyPaid = true, onlyToday = false } = {}) =>
-  orders.reduce((acc, o) => {
-    if (onlyPaid && !PAID_STATUSES.has(o.status)) return acc;
-    if (onlyToday && !isSameDayLocal(o.createdAt)) return acc;
+// ยอดขาย (เฉพาะจาก history)
+const sumSalesFromHistory = (rows = [], { onlyToday = false } = {}) =>
+  rows.reduce((acc, o) => {
+    const d = toDate(o.createdAt);
+    if (onlyToday && !isSameDayLocal(d)) return acc;
     return acc + toNum(o.total);
   }, 0);
 
-/* เลือกเฉพาะ orders วันนี้ */
-const filterToday = (orders = []) => orders.filter((o) => isSameDayLocal(o.createdAt));
-
 /* ---------- component ---------- */
-export default function HomeShop() {
+export default function HomeShop(props) {
+  const route  = useRoute();
+  const shopId = route?.params?.shopId ?? props?.shopId ?? "";
+
+  const token = useSelector((s) => s?.auth?.token ?? "");
+  const requestHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState(null);
+  const [err, setErr]       = useState(null);
 
-  // KPI (คำนวณเองใน FE)
+  // KPI states
   const [stats, setStats] = useState({
     todaySales: 0,
     orderCount: 0,
@@ -123,147 +132,178 @@ export default function HomeShop() {
     totalSales: 0,
   });
 
-  // รายการแสดงผล
+  // Data sources
   const [ordersRecent, setOrdersRecent] = useState([]);
-  const [ordersToday, setOrdersToday] = useState([]);
-  const [ordersAll, setOrdersAll] = useState([]); // ใช้คำนวณ totalSales
+  const [ordersAllLive, setOrdersAllLive] = useState([]);
+  const [historyAll, setHistoryAll] = useState([]);
   const [reservesToday, setReservesToday] = useState([]);
 
-  const [ordersLoading, setOrdersLoading] = useState(true);
+  // Loading flags
+  const [ordersLoading, setOrdersLoading]   = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [reservesLoading, setReservesLoading] = useState(true);
+
+  // Refresh flags
+  const [refreshing, setRefreshing] = useState(false); // ⬅️ state สำหรับ pull-to-refresh / ปุ่มรีเฟรช
 
   const tryGet = async (url) => {
     try {
-      const { data } = await api.get(url);
+      const { data } = await api.get(url, requestHeaders ? { headers: requestHeaders } : undefined);
       return data;
-    } catch {
+    } catch (e) {
+      if (DEBUG) console.log("⚠️ tryGet failed:", url, toErr(e));
       return null;
     }
   };
 
   const fetchShop = useCallback(async () => {
+    if (!shopId) {
+      setLoading(false);
+      setErr({ status: 400, message: "ไม่พบรหัสร้าน (shopId) จากหน้าก่อนหน้า" });
+      return;
+    }
     setLoading(true);
     setErr(null);
     try {
-      const { data } = await api.get(`/shop/${SHOP_ID}`);
+      if (DEBUG) console.groupCollapsed("🏪 fetchShop", shopId);
+      const { data } = await api.get(`/shop/${shopId}`, requestHeaders ? { headers: requestHeaders } : undefined);
+      if (DEBUG) console.log("RAW /shop/:id =", data);
       const shopData = data?.shop || data || null;
       if (!shopData) throw new Error("ยังไม่มีร้าน โปรดสร้างร้านก่อน");
-      setShop(normalizeShop(shopData));
+      const norm = normalizeShop(shopData);
+      if (DEBUG) console.log("NORMALIZED shop =", norm);
+      setShop(norm);
     } catch (e) {
-      setErr(toErr(e, "โหลดข้อมูลร้านไม่สำเร็จ"));
+      const er = toErr(e, "โหลดข้อมูลร้านไม่สำเร็จ");
+      if (DEBUG) console.error("❌ fetchShop error:", er);
+      setErr(er);
     } finally {
+      if (DEBUG) console.groupEnd();
       setLoading(false);
     }
-  }, []);
+  }, [shopId, token]);
 
-  /* ดึง orders (recent, today, all) เพื่อใช้คำนวณ KPI เอง */
   const fetchOrdersForKPI = useCallback(async () => {
+    if (!shopId) return;
     setOrdersLoading(true);
-
-    // recent 8 (เพื่อโชว์การ์ดรายการ)
-    const candRecent = [
-      `/shop/${SHOP_ID}/orders/recent?limit=8`,
-      `/orders/recent?shopId=${SHOP_ID}&limit=8`,
-      `/shops/${SHOP_ID}/orders?recent=true&limit=8`,
-    ];
-    let recent = null;
-    for (const u of candRecent) {
-      const got = await tryGet(u);
-      if (got?.orders || Array.isArray(got)) {
-        recent = normalizeOrders(got.orders || got);
-        break;
+    try {
+      if (DEBUG) console.groupCollapsed("📦 fetchOrders (live)", shopId);
+      const { data } = await api.get(`/shops/${shopId}/orders`, requestHeaders ? { headers: requestHeaders } : undefined);
+      if (DEBUG) console.log("RAW /shops/:id/orders =", data);
+      const list = Array.isArray(data) ? data : data?.orders || [];
+      const live = normalizeOrders(list);
+      if (DEBUG) {
+        console.log("NORMALIZED live len =", live.length);
+        if (live[0]) console.log("SAMPLE live[0] =", live[0]);
       }
+      setOrdersAllLive(live);
+      setOrdersRecent(live.slice(0, 8));
+    } catch (e) {
+      const er = toErr(e, "โหลด orders ไม่สำเร็จ");
+      if (DEBUG) console.error("❌ fetchOrders error:", er);
+      setOrdersAllLive([]);
+      setOrdersRecent([]);
+    } finally {
+      if (DEBUG) console.groupEnd();
+      setOrdersLoading(false);
     }
-    setOrdersRecent(recent || []);
+  }, [shopId, token]);
 
-    // today
-    const candToday = [
-      `/shop/${SHOP_ID}/orders?range=today`,
-      `/orders?shopId=${SHOP_ID}&range=today`,
-      `/shops/${SHOP_ID}/orders?date=today`,
-    ];
-    let todayList = null;
-    for (const u of candToday) {
-      const got = await tryGet(u);
-      if (got?.orders || Array.isArray(got)) {
-        todayList = normalizeOrders(got.orders || got);
-        break;
+  const fetchHistoryAll = useCallback(async () => {
+    if (!shopId) return;
+    setHistoryLoading(true);
+    try {
+      if (DEBUG) console.groupCollapsed("🗂️ fetchHistory", shopId);
+      const { data } = await api.get(`/shops/${shopId}/history/orders`, requestHeaders ? { headers: requestHeaders } : undefined);
+      if (DEBUG) console.log("RAW /shops/:id/history/orders =", data);
+      const list = Array.isArray(data) ? data : data?.history || [];
+      const hist = normalizeHistory(list);
+      if (DEBUG) {
+        console.log("NORMALIZED history len =", hist.length);
+        if (hist[0]) console.log("SAMPLE history[0] =", hist[0]);
       }
+      setHistoryAll(hist);
+    } catch (e) {
+      const er = toErr(e, "โหลด history ไม่สำเร็จ");
+      if (DEBUG) console.error("❌ fetchHistory error:", er);
+      setHistoryAll([]);
+    } finally {
+      if (DEBUG) console.groupEnd();
+      setHistoryLoading(false);
     }
-    if (!todayList && recent) {
-      todayList = filterToday(recent);
-    }
-    setOrdersToday(todayList || []);
+  }, [shopId, token]);
 
-    // all
-    const candAll = [
-      `/shop/${SHOP_ID}/orders?range=all`,
-      `/orders?shopId=${SHOP_ID}`,
-      `/shops/${SHOP_ID}/orders`,
-    ];
-    let allList = null;
-    for (const u of candAll) {
-      const got = await tryGet(u);
-      if (got?.orders || Array.isArray(got)) {
-        allList = normalizeOrders(got.orders || got);
-        break;
-      }
-    }
-    setOrdersAll(allList || todayList || []);
-
-    setOrdersLoading(false);
-  }, []);
-
-  /* ดึง reservations (today) */
   const fetchReservesToday = useCallback(async () => {
+    if (!shopId) return;
     setReservesLoading(true);
-    const candidates = [
-      `/shop/${SHOP_ID}/reservations/today`,
-      `/reservations?shopId=${SHOP_ID}&range=today`,
-      `/shops/${SHOP_ID}/reservations?date=today`,
-    ];
-    let list = null;
-    for (const u of candidates) {
-      const got = await tryGet(u);
-      if (got?.reservations || Array.isArray(got)) {
-        list = normalizeReserves(got.reservations || got);
-        break;
+    try {
+      if (DEBUG) console.groupCollapsed("📘 fetchReservesToday", shopId);
+      // (เตรียม endpoint ไว้—เพิ่มจริงภายหลัง)
+      const candidates = [
+        // `/shops/${shopId}/reservations?date=today`,
+      ];
+      let list = null;
+      for (const u of candidates) {
+        const got = await tryGet(u);
+        if (got?.reservations || Array.isArray(got)) {
+          list = normalizeReserves(got.reservations || got);
+          break;
+        }
       }
+      setReservesToday(list || []);
+      if (DEBUG) console.log("reservesToday len =", (list || []).length);
+    } catch (e) {
+      const er = toErr(e, "โหลดการจองวันนี้ไม่สำเร็จ");
+      if (DEBUG) console.error("❌ fetchReservesToday error:", er);
+      setReservesToday([]);
+    } finally {
+      if (DEBUG) console.groupEnd();
+      setReservesLoading(false);
     }
-    setReservesToday(list || []);
-    setReservesLoading(false);
-  }, []);
+  }, [shopId, token]);
 
-  /* คำนวณ KPI */
-  useEffect(() => {
-    const todaySales = sumSales(ordersToday, { onlyPaid: true, onlyToday: true });
-    const totalSales = sumSales(ordersAll, { onlyPaid: true, onlyToday: false });
-    setStats({
-      todaySales,
-      orderCount: ordersToday.length,
-      reserveCount: reservesToday.length,
-      totalSales,
-    });
-  }, [ordersToday, ordersAll, reservesToday]);
-
+  // โหลดครั้งแรก
   useEffect(() => {
     fetchShop();
     fetchOrdersForKPI();
+    fetchHistoryAll();
     fetchReservesToday();
-  }, [fetchShop, fetchOrdersForKPI, fetchReservesToday]);
+  }, [fetchShop, fetchOrdersForKPI, fetchHistoryAll, fetchReservesToday]);
+
+  // คำนวณ KPI
+  useEffect(() => {
+    const todaySales   = sumSalesFromHistory(historyAll, { onlyToday: true });
+    const orderCount   = (ordersAllLive?.length || 0) + (historyAll?.length || 0);
+    const reserveCount = reservesToday?.length || 0;
+    const totalSales   = sumSalesFromHistory(historyAll, { onlyToday: false });
+
+    if (DEBUG) {
+      console.groupCollapsed("📊 KPI computed");
+      console.log("todaySales =", todaySales);
+      console.log("orderCount =", orderCount, "(live:", ordersAllLive.length, ", history:", historyAll.length, ")");
+      console.log("reserveCount =", reserveCount);
+      console.log("totalSales =", totalSales);
+      console.groupEnd();
+    }
+    setStats({ todaySales, orderCount, reserveCount, totalSales });
+  }, [ordersAllLive, historyAll, reservesToday]);
 
   const shopName = useMemo(() => shop?.shop_name || "—", [shop]);
 
-  // การ์ด KPI 4 ใบ — ใช้พาเล็ตกลาง
-  const kpiCards = useMemo(
-    () => [
-      { key: "todaySales",   label: "ยอดขายวันนี้",  value: currencyTHB(stats.todaySales),  bg: c.S1 },
-      { key: "orderCount",   label: "จำนวนออเดอร์",  value: `${stats.orderCount} รายการ`,    bg: c.S2 },
-      { key: "reserveCount", label: "จำนวนคนจอง",    value: `${stats.reserveCount} รายการ`, bg: c.S5 },
-      { key: "totalSales",   label: "ยอดขายทั้งหมด", value: currencyTHB(stats.totalSales),  bg: c.blue },
-    ],
-    [stats]
-  );
+  // 🔄 ฟังก์ชันรีเฟรชรวม
+  const doRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchShop(),
+        fetchOrdersForKPI(),
+        fetchHistoryAll(),
+        fetchReservesToday(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchShop, fetchOrdersForKPI, fetchHistoryAll, fetchReservesToday]);
 
   const Section = ({ title, right, children, mt = 14 }) => (
     <View style={{ marginTop: mt }}>
@@ -283,31 +323,80 @@ export default function HomeShop() {
     </View>
   );
 
-  const EmptyRow = ({ text = "ยังไม่มีข้อมูล" }) => (
-    <View
-      style={{
-        height: 96,
-        borderRadius: 12,
-        backgroundColor: c.S4,
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 12,
-        paddingHorizontal: 16,
-      }}
-    >
-      <Text style={{ color: c.black, opacity: 0.6 }}>{text}</Text>
-    </View>
-  );
+  if (!shopId) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Text style={{ color: c.red, textAlign: "center" }}>
+            ไม่พบ shopId — กรุณาเปิดผ่านเมนูที่ส่งค่า shopId มายังหน้านี้
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor:"white" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
       <StatusBar barStyle="dark-content" />
+
+      {/* 🧰 DEBUG BOX */}
+      {DEBUG && (
+        <View
+          style={{
+            margin: 12,
+            padding: 10,
+            borderRadius: 12,
+            backgroundColor: "#fff7ed",
+            borderWidth: 1,
+            borderColor: "#fdba74",
+          }}
+        >
+          <Text style={{ color: "#7c2d12", fontWeight: "800", marginBottom: 6 }}>
+            🛠 DEBUG (ไม่แสดงในโปรดักชัน)
+          </Text>
+          <Text style={{ color: "#7c2d12" }}>shopId: {String(shopId)}</Text>
+          <Text style={{ color: "#7c2d12" }}>
+            live: {ordersAllLive.length} | history: {historyAll.length} | reservesToday: {reservesToday.length}
+          </Text>
+          <Text style={{ color: "#7c2d12" }}>
+            KPI → today: {currencyTHB(stats.todaySales)} | total: {currencyTHB(stats.totalSales)} | orders: {stats.orderCount} | reserves: {stats.reserveCount}
+          </Text>
+        </View>
+      )}
+
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 30, paddingLeft: 20, paddingRight: 20, paddingBottom: 24 }}
+        contentContainerStyle={{ paddingTop: 10, paddingLeft: 20, paddingRight: 20, paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={doRefresh}       // ⬅️ ดึงลงเพื่อรีเฟรช
+            colors={[c.S2]}
+            tintColor={c.S2}
+          />
+        }
       >
         {/* Header */}
-        <Text style={{ fontSize: 20, marginBottom: 10, color: c.black }}>ร้าน: {shopName}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <Text style={{ fontSize: 20, color: c.black }}>ร้าน: {shopName}</Text>
+
+          {/* ปุ่มรีเฟรชบน Header (เผื่ออยากกดจากบนสุด) */}
+          <Pressable
+            onPress={doRefresh}
+            style={{
+              backgroundColor: c.S2,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 10,
+              opacity: refreshing ? 0.7 : 1,
+            }}
+            disabled={refreshing}
+          >
+            <Text style={{ color: c.fullwhite, fontWeight: "800" }}>
+              {refreshing ? "รีเฟรช..." : "รีเฟรช"}
+            </Text>
+          </Pressable>
+        </View>
 
         {/* โหลด/แสดง error ร้าน */}
         {loading && (
@@ -321,11 +410,7 @@ export default function HomeShop() {
             {!!err.status && <Text style={{ color: c.red, marginBottom: 4 }}>HTTP {err.status}</Text>}
             <Text style={{ color: c.red }}>{err.message}</Text>
             <Pressable
-              onPress={() => {
-                fetchShop();
-                fetchOrdersForKPI();
-                fetchReservesToday();
-              }}
+              onPress={doRefresh}
               style={{
                 marginTop: 10,
                 alignSelf: "flex-start",
@@ -343,14 +428,19 @@ export default function HomeShop() {
         {/* KPI 4 ช่อง */}
         {!err && (
           <Section title="ภาพรวมวันนี้" mt={6}>
-            {ordersLoading && reservesLoading ? (
+            {ordersLoading || historyLoading || reservesLoading ? (
               <View style={{ paddingVertical: 16 }}>
                 <ActivityIndicator size="small" color={c.S2} />
                 <Text style={{ marginTop: 6, color: c.black, opacity: 0.6 }}>กำลังโหลดสถิติ…</Text>
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 12 }}>
-                {kpiCards.map((k) => (
+                {[
+                  { key: "todaySales",   label: "ยอดขายวันนี้",  value: currencyTHB(stats.todaySales),  bg: c.S1 },
+                  { key: "orderCount",   label: "จำนวนออเดอร์",  value: `${stats.orderCount} รายการ`,    bg: c.S2 },
+                  { key: "reserveCount", label: "จำนวนคนจอง",    value: `${stats.reserveCount} รายการ`, bg: c.S5 },
+                  { key: "totalSales",   label: "ยอดขายทั้งหมด", value: currencyTHB(stats.totalSales),  bg: c.blue },
+                ].map((k) => (
                   <View
                     key={k.key}
                     style={{
@@ -372,12 +462,12 @@ export default function HomeShop() {
           </Section>
         )}
 
-        {/* ออเดอร์ล่าสุด */}
+        {/* ออเดอร์ล่าสุด (จาก live) */}
         <Section
           title="ออเดอร์ล่าสุด"
           right={
-            <Pressable onPress={() => {}}>
-              <Text style={{ color: c.black, opacity: 0.6 }}>ดูทั้งหมด</Text>
+            <Pressable onPress={doRefresh}>
+              <Text style={{ color: c.black, opacity: 0.6 }}>{refreshing ? "กำลังรีเฟรช…" : "รีเฟรช"}</Text>
             </Pressable>
           }
         >
@@ -387,7 +477,11 @@ export default function HomeShop() {
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 12 }}>
-              {ordersRecent.length === 0 && <EmptyRow text="ยังไม่มีออเดอร์วันนี้" />}
+              {ordersRecent.length === 0 && (
+                <View style={{ paddingVertical: 12 }}>
+                  <Text style={{ color: c.black, opacity: 0.6 }}>ยังไม่มีออเดอร์วันนี้</Text>
+                </View>
+              )}
               {ordersRecent.map((o) => (
                 <Pressable
                   key={o.id}
@@ -424,8 +518,8 @@ export default function HomeShop() {
         <Section
           title="การจองวันนี้"
           right={
-            <Pressable onPress={() => {}}>
-              <Text style={{ color: c.S1, fontWeight: "700" }}>ดูทั้งหมด</Text>
+            <Pressable onPress={doRefresh}>
+              <Text style={{ color: c.S1, fontWeight: "700" }}>{refreshing ? "รีเฟรช…" : "รีเฟรช"}</Text>
             </Pressable>
           }
         >
@@ -435,7 +529,11 @@ export default function HomeShop() {
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 12 }}>
-              {reservesToday.length === 0 && <EmptyRow text="ยังไม่มีการจองวันนี้" />}
+              {reservesToday.length === 0 && (
+                <View style={{ paddingVertical: 12 }}>
+                  <Text style={{ color: c.black, opacity: 0.6 }}>ยังไม่มีการจองวันนี้</Text>
+                </View>
+              )}
               {reservesToday.map((r) => (
                 <Pressable
                   key={r.id}
@@ -467,6 +565,33 @@ export default function HomeShop() {
           )}
         </Section>
       </ScrollView>
+
+      {/* 🔘 ปุ่มรีเฟรชลอย (มุมขวาล่าง) */}
+      <Pressable
+        onPress={doRefresh}
+        disabled={refreshing}
+        style={{
+          position: "absolute",
+          right: 18,
+          bottom: 24,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: c.S2,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOpacity: 0.2,
+          shadowOffset: { width: 0, height: 2 },
+          shadowRadius: 4,
+          elevation: 4,
+          opacity: refreshing ? 0.7 : 1,
+        }}
+      >
+        <Text style={{ color: c.fullwhite, fontWeight: "900" }}>
+          {refreshing ? "↻" : "⟳"}
+        </Text>
+      </Pressable>
     </SafeAreaView>
   );
 }

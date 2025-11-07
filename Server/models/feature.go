@@ -1,7 +1,11 @@
 package models
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
+/* ---------- OrderItem (ในแต่ละออเดอร์) ---------- */
 type OrderItem struct {
 	ID          string  `json:"id" firestore:"id"` // menuId
 	Name        string  `json:"name" firestore:"name"`
@@ -12,9 +16,10 @@ type OrderItem struct {
 	Extras      any     `json:"extras,omitempty" firestore:"extras,omitempty"`
 }
 
+/* ---------- Order (เอกสารหลักใน Firestore) ---------- */
 type Order struct {
-	ID         string      `json:"id" firestore:"-"` // Firestore DocID
-	ShopID     string      `json:"shop_id" firestore:"shop_id"`
+	ID         string      `json:"id" firestore:"-"` // Firestore Document ID
+	ShopID     string      `json:"shop_id" firestore:"shopId"`
 	CustomerID string      `json:"customer_id" firestore:"customer_id"`
 	Status     string      `json:"status" firestore:"status"`
 	Items      []OrderItem `json:"items" firestore:"items"`
@@ -24,13 +29,14 @@ type Order struct {
 	CreatedAt time.Time `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt" firestore:"updatedAt"`
 
-	// optional display only (ไม่บังคับ)
+	// Optional display fields
 	CustomerName string `json:"customer_name,omitempty" firestore:"customer_name,omitempty"`
 	ShopName     string `json:"shop_name,omitempty" firestore:"shop_name,omitempty"`
 }
 
+/* ---------- Request Struct ---------- */
 type CreateOrderReq struct {
-	ShopID       string      `json:"shop_id"`
+	ShopID       string      `json:"shopId"`
 	CustomerID   string      `json:"customer_id"`
 	Items        []OrderItem `json:"items"`
 	Note         string      `json:"note"`
@@ -41,42 +47,37 @@ type UpdateOrderStatusReq struct {
 	Status string `json:"status"`
 }
 
+/* ---------- Enum สถานะออเดอร์ ---------- */
 const (
-	OrderPending   = "pending"
-	OrderConfirmed = "confirmed" // เผื่อใช้ในอนาคต
-	OrderPrepare   = "prepare"
-	OrderReady     = "ready"
-	OrderCompleted = "completed"
-	OrderCancelled = "cancelled"
+	OrderPrepare = "prepare"
+	OrderOnGoing = "ongoing"
+	OrderDone    = "done"
 )
 
 var AllowedOrderStatus = map[string]bool{
-	OrderPending:   true,
-	OrderConfirmed: true,
-	OrderPrepare:   true,
-	OrderReady:     true,
-	OrderCompleted: true,
-	OrderCancelled: true,
+	OrderPrepare: true,
+	OrderOnGoing: true,
+	OrderDone:    true,
 }
 
-type Reservation struct {
-	ID        string    `json:"id,omitempty" firestore:"-"`
-	ShopID    string    `json:"shop_id" firestore:"shop_id"`
-	UserID    string    `json:"user_id" firestore:"user_id"`
-	People    int       `json:"people" firestore:"people"`
-	Phone     string    `json:"phone,omitempty" firestore:"phone,omitempty"`
-	Note      string    `json:"note,omitempty" firestore:"note,omitempty"`
-	StartAt   time.Time `json:"startAt" firestore:"startAt"`
-	DayKey    string    `json:"dayKey" firestore:"dayKey"`
-	CreatedAt time.Time `json:"createdAt" firestore:"createdAt"`
+/* ---------- Helpers ---------- */
+
+// NormalizeOrderStatus คืนค่า canonical (prepare | on-going | done)
+func NormalizeOrderStatus(s string) (string, bool) {
+	x := strings.TrimSpace(strings.ToLower(s))
+	switch x {
+	case "prepare", "preparing":
+		return OrderPrepare, true
+	case "ongoing", "on-going", "on_going", "in-progress", "in progress":
+		return OrderOnGoing, true
+	case "done", "completed", "complete", "finish", "finished":
+		return OrderDone, true
+	default:
+		return "", false
+	}
 }
 
-type CreateReservationReq struct {
-	UserID  string    `json:"user_id"`
-	People  int       `json:"people"`
-	Phone   string    `json:"phone,omitempty"`
-	Note    string    `json:"note,omitempty"`
-	StartAt time.Time `json:"startAt"`
+func IsOrderDone(s string) bool {
+	canon, ok := NormalizeOrderStatus(s)
+	return ok && canon == OrderDone
 }
-
-const ColReservations = "reservations"

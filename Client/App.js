@@ -6,20 +6,17 @@ import StackNav from './src/StackNav.js';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/redux/store.js';
+import { StyleSheet } from 'react-native';
 
-// i18n (Paraglide)
-import { getLocale, setLocale } from "./paraglide/runtime.js";
-import { m } from "./paraglide/messages.js";
+
 
 export default function App() {
   const [language, setLaguage] = useState(getLocale());
-  enableScreens(false);
   const toggleLanguage = () => {
     const newLang = language === "th" ? "en" : "th";
     setLocale(newLang);
     setLaguage(newLang);
   };
-const Stack = createNativeStackNavigator();
 
   return (
     <Provider store={store}>

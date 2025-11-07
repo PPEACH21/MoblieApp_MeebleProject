@@ -15,15 +15,17 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
+import { useRoute } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 import { api } from "../axios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
-import { BaseColor } from "../components/Color"; 
+import { BaseColor } from "../components/Color";
 
-const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
+/* ---------- constants ---------- */
 const STATUS_OPEN = "open";
 const STATUS_CLOSED = "closed";
 
@@ -37,7 +39,7 @@ const TYPE_LABEL = {
   Dessert: "Dessert",
 };
 
-/* ---------- Base styles ที่ใช้สีจาก BaseColor ---------- */
+/* ---------- styles ---------- */
 const baseStyles = {
   container: { flex: 1, padding: 16, backgroundColor: "white" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -95,7 +97,6 @@ const baseStyles = {
   },
 };
 
-/* ---------- small style helpers (ใช้พาเล็ตจาก BaseColor) ---------- */
 const styles = {
   headerRow: {
     flexDirection: "row",
@@ -135,15 +136,6 @@ const styles = {
     borderBottomWidth: 1,
     borderBottomColor: BaseColor.S4,
   },
-  dangerBtn: {
-    backgroundColor: "#ffe5e5",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  dangerText: { color: BaseColor.red, fontWeight: "700" },
-
-  /* ฟิลด์แบบ “นิ่ม” */
   fieldWrap: { marginBottom: 12 },
   fieldLabelNice: { color: BaseColor.black, fontWeight: "700", marginBottom: 6 },
   fieldBox: {
@@ -162,8 +154,6 @@ const styles = {
   fieldBoxFocused: { borderColor: BaseColor.S2 },
   inputNice: { fontSize: 16, color: BaseColor.black },
   textareaNice: { fontSize: 16, color: BaseColor.black, minHeight: 96, textAlignVertical: "top" },
-
-  /* Select แบบกล่อง */
   selectBox: {
     backgroundColor: BaseColor.fullwhite,
     borderWidth: 1.5,
@@ -197,22 +187,33 @@ const toErr = (e, fallback = "เกิดข้อผิดพลาด") => {
   return { status, message: String(message) };
 };
 
-const toBool = (v) => v === true || v === "true" || v === 1 || v === "1";
+const toBool = (v) => {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    return s === "1" || s === "true" || s === "yes" || s === "open" || s === "enabled";
+  }
+  return false;
+};
 
-const normalizeShop = (s) =>
-  s
-    ? {
-        ...s,
-        order_active: !!toBool(s.order_active),
-        reserve_active: !!toBool(s.reserve_active),
-        status:
-          (s.status || s.shop_status || s.State || STATUS_OPEN)
-            .toString()
-            .toLowerCase() === STATUS_CLOSED
-            ? STATUS_CLOSED
-            : STATUS_OPEN,
-      }
-    : s;
+const normalizeShop = (s) => {
+  if (!s) return s;
+  const rawStatus = s.status ?? s.shop_status ?? s.State ?? s.is_open ?? s.open ?? s.enabled;
+  const statusIsClosed =
+    (typeof rawStatus === "string" && rawStatus.toLowerCase() === "closed") ||
+    (typeof rawStatus !== "string" && !toBool(rawStatus));
+  return {
+    ...s,
+    order_active: toBool(
+      s.order_active ?? s.orderActive ?? s.accept_order ?? s.is_order_open
+    ),
+    reserve_active: toBool(
+      s.reserve_active ?? s.reserveActive ?? s.accept_reserve ?? s.is_reserve_open
+    ),
+    status: statusIsClosed ? STATUS_CLOSED : STATUS_OPEN,
+  };
+};
 
 /* ---------- image helpers ---------- */
 function guessMimeFromUri(uri = "") {
@@ -275,7 +276,18 @@ async function uploadToImgbb(base64) {
   return json?.data?.display_url || json?.data?.url;
 }
 
-export default function HomeShop() {
+/* ---------- component ---------- */
+export default function HomeShop(props) {
+  const route = useRoute();
+  const shopId = route?.params?.shopId ?? props?.shopId ?? "";
+
+  // token จาก Redux (ไม่มี Firebase Auth)
+  const token = useSelector((s) => s?.auth?.token ?? "");
+  const buildHeaders = useCallback(
+    () => (token ? { Authorization: `Bearer ${token}` } : {}),
+    [token]
+  );
+
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({ shop: false, order: false, reserve: false });
@@ -288,49 +300,63 @@ export default function HomeShop() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
-  // ✅ ตัวเปิด/ปิดรายการประเภท
   const [typePickerOpen, setTypePickerOpen] = useState(false);
 
+  /* ---------- fetch shop ---------- */
   const fetchShop = useCallback(async () => {
+    if (!shopId) {
+      setErr({ status: 400, message: "ไม่พบ shopId (ต้องส่งจาก route/props)" });
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setErr(null);
-      const res = await api.get(`/shop/${SHOP_ID}`);
+      const res = await api.get(`/shop/${shopId}`, {
+        headers: { ...buildHeaders(), "Cache-Control": "no-cache" },
+        params: { _ts: Date.now() },
+      });
       const found = res?.data?.shop ?? res?.data ?? null;
       if (!found) {
         setErr({ status: 404, message: "ยังไม่มีร้าน โปรดสร้างร้านก่อน" });
       }
-      const norm = normalizeShop(found);
-      setShop(norm);
+      setShop(normalizeShop(found));
     } catch (e) {
       setErr(toErr(e, "โหลดข้อมูลร้านไม่สำเร็จ"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [shopId, buildHeaders]);
 
   useEffect(() => {
     fetchShop();
   }, [fetchShop]);
 
-  const updateShopPartial = useCallback(
+  /* ---------- update (สำหรับสวิตช์ ใช้ /shop/:id) ---------- */
+  const updateFlags = useCallback(
     async (patch) => {
-      const id = shop?.ID || shop?.id || SHOP_ID;
-      await api.put(`/shop/${id}/update`, patch);
-      setShop((prev) => (prev ? { ...prev, ...patch } : prev));
+      const id = shop?.ID || shop?.id || shopId;
+      if (!id) throw new Error("no shop id");
+      await api.put(`/shop/${id}`, patch, { headers: buildHeaders() });
+      await fetchShop();
     },
-    [shop]
+    [shop, shopId, buildHeaders, fetchShop]
   );
 
   const isOpen = (shop?.status || STATUS_OPEN) === STATUS_OPEN;
 
+  /* ---------- toggles ---------- */
   const onToggleShop = async (val) => {
     try {
       setSaving((s) => ({ ...s, shop: true }));
       if (val) {
-        await updateShopPartial({ status: STATUS_OPEN });
+        await updateFlags({ status: STATUS_OPEN });
       } else {
-        await updateShopPartial({ status: STATUS_CLOSED, order_active: false, reserve_active: false });
+        await updateFlags({
+          status: STATUS_CLOSED,
+          order_active: false,
+          reserve_active: false,
+        });
       }
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะร้านไม่สำเร็จ");
@@ -348,7 +374,7 @@ export default function HomeShop() {
     }
     try {
       setSaving((s) => ({ ...s, order: true }));
-      await updateShopPartial({ order_active: !!val });
+      await updateFlags({ order_active: !!val });
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะรับออเดอร์ไม่สำเร็จ");
       setErr(er);
@@ -365,7 +391,7 @@ export default function HomeShop() {
     }
     try {
       setSaving((s) => ({ ...s, reserve: true }));
-      await updateShopPartial({ reserve_active: !!val });
+      await updateFlags({ reserve_active: !!val });
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะรับการจองไม่สำเร็จ");
       setErr(er);
@@ -375,10 +401,12 @@ export default function HomeShop() {
     }
   };
 
+  /* ---------- computed ---------- */
   const shopName = useMemo(() => shop?.shop_name || shop?.name || "—", [shop]);
-  const shopImg = shop?.image && String(shop?.image).trim().length > 0 ? String(shop.image) : null;
+  const shopImg =
+    shop?.image && String(shop?.image).trim().length > 0 ? String(shop.image) : null;
 
-  /* ---------- open edit modal ---------- */
+  /* ---------- edit modal ---------- */
   const openEditModal = () => {
     setEdit({
       shop_name: String(shop?.shop_name || shop?.name || ""),
@@ -391,7 +419,6 @@ export default function HomeShop() {
     setOpenEdit(true);
   };
 
-  /* ---------- image pick inside edit modal ---------- */
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
@@ -418,7 +445,6 @@ export default function HomeShop() {
     }
   };
 
-  /* ---------- save edit ---------- */
   const onSaveEdit = async () => {
     if (!edit.shop_name.trim()) {
       Alert.alert("กรอกไม่ครบ", "กรุณากรอกชื่อร้าน");
@@ -428,11 +454,9 @@ export default function HomeShop() {
       Alert.alert("กรอกไม่ครบ", "กรุณาเลือกประเภท");
       return;
     }
-
     try {
       setSubmittingEdit(true);
 
-      // อัปโหลดรูป (ถ้าไม่ใช่ URL)
       let imageUrl = "";
       const { base64, passthroughUrl } = await ensureBase64(edit.image);
       if (passthroughUrl) imageUrl = passthroughUrl;
@@ -447,12 +471,11 @@ export default function HomeShop() {
         type: edit.type,
         image: imageUrl || "",
       };
-      const id = shop?.ID || shop?.id || SHOP_ID;
+      const id = shop?.ID || shop?.id || shopId;
 
-      // optimistic UI
+      // optimistic
       setShop((prev) => (prev ? { ...prev, ...patch } : prev));
-      await api.put(`/shop/${id}/update`, patch);
-
+      await api.put(`/shop/${id}/update`, patch, { headers: buildHeaders() });
       setOpenEdit(false);
       await fetchShop();
     } catch (e) {
@@ -465,6 +488,16 @@ export default function HomeShop() {
   };
 
   /* ---------- renders ---------- */
+  if (!shopId) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <View style={baseStyles.center}>
+          <Text style={baseStyles.error}>ไม่พบ shopId — ต้องส่งผ่าน route/props</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (loading) {
     return (
       <View style={baseStyles.center}>
@@ -735,7 +768,6 @@ export default function HomeShop() {
                     <Text style={styles.chevron}>▼</Text>
                   </TouchableOpacity>
 
-                  {/* รายการประเภท (โชว์เมื่อกด) */}
                   {typePickerOpen && (
                     <View
                       style={{
