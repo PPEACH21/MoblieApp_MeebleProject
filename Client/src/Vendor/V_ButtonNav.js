@@ -1,61 +1,72 @@
 // src/Vendor/V_ButtonNav.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { ActivityIndicator, View, Text } from "react-native";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import AppTabs from "../Navigation/appTab.js";
 import { api } from "../axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+// (ถ้ามี action logout ใน slice ให้เปิดบรรทัดนี้)
+// import { logout } from "../redux/slices/authSlice";
 
 export default function V_ButtonNav() {
+  const dispatch = useDispatch();
   const authState = useSelector((s) => s.auth);
 
-  // รองรับสองรูปแบบที่คุณเคยใช้: uid หรือ user
-  const vendorId = useMemo(
-    () => authState?.uid ?? authState?.user ?? "",
-    [authState?.uid, authState?.user]
-  );
+  // ✅ รองรับทั้ง uid เป็นสตริง หรือ user เป็น object ({ uid: "..." })
+  const vendorId = useMemo(() => {
+    const a = authState?.uid;
+    const b = authState?.user;
+    if (typeof a === "string" && a) return a;
+    if (typeof b === "string" && b) return b;
+    if (b && typeof b === "object" && b.uid) return String(b.uid);
+    return "";
+  }, [authState?.uid, authState?.user]);
 
-  // token ที่แนบไปกับ header (พยายามหาให้ครบทุกแหล่ง)
   const [bearer, setBearer] = useState(authState?.token ?? "");
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
 
-  // เตรียม token ถ้าใน Redux ไม่มี
+  // ✅ เติม: มี token ไหม (memo)
+  const hasToken = useMemo(() => !!(bearer && String(bearer).trim()), [bearer]);
+
+  // ✅ เตรียม token จาก Redux หรือ AsyncStorage
   useEffect(() => {
     let cancelled = false;
-
-    const ensureToken = async () => {
+    (async () => {
       try {
-        // 1) ถ้ามีใน Redux ใช้เลย
         if (authState?.token) {
           if (!cancelled) setBearer(authState.token);
           return;
         }
-        // 3) ลองดึง JWT ของระบบคุณเองจาก AsyncStorage
         const stored = await AsyncStorage.getItem("token");
-        if (stored && !cancelled) {
-          setBearer(stored);
-          return;
+        if (!cancelled) setBearer(stored || "");
+        if (!stored && !authState?.token && !cancelled) {
+          setShop(null);
+          setMsg("กรุณาเข้าสู่ระบบ");
+          setLoading(false);
         }
-      } catch (e) {
-        // ไม่เป็นไร แค่ไม่มี token
+      } catch {
+        if (!cancelled) {
+          setBearer("");
+          setShop(null);
+          setMsg("กรุณาเข้าสู่ระบบ");
+          setLoading(false);
+        }
       }
-    };
-
-    ensureToken();
-    return () => {
-      cancelled = true;
-    };
+    })();
+    return () => { cancelled = true; };
   }, [authState?.token]);
 
-  // โหลดร้านจาก vendorId
+  // ✅ โหลดร้านเมื่อมี token + vendorId เท่านั้น
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
+      if (!hasToken) { setLoading(false); return; }
       if (!vendorId) {
         setMsg("ยังไม่พบ vendorId ใน state");
+        setShop(null);
         setLoading(false);
         return;
       }
@@ -63,43 +74,58 @@ export default function V_ButtonNav() {
       setLoading(true);
       setMsg("");
 
-      const url = `/shops/vendor/${vendorId}`; // ✅ ค้นร้านจากฟิลด์ vendor_id
-      const headers = bearer ? { Authorization: `Bearer ${bearer}` } : {};
-
       try {
-        console.log("➡️ GET", url, "token?", !!bearer);
+        const headers = { Authorization: `Bearer ${bearer}` };
+        const url = `/shops/vendor/${vendorId}`;
         const res = await api.get(url, { headers });
-        const found = res?.data?.shop ?? null;
-
         if (cancelled) return;
 
+        const found = res?.data?.shop ?? null;
         if (found) {
           setShop(found);
+          setMsg("");
         } else {
+          setShop(null);
           setMsg("ไม่พบร้านในบัญชีนี้");
         }
       } catch (e) {
         if (cancelled) return;
-
         const status = e?.response?.status;
-        const data = e?.response?.data;
-        console.log("❌ error", status, data || e?.message);
-
-        if (status === 404) setMsg("ไม่พบร้านของบัญชีนี้ (404)");
-        else if (status === 401) setMsg("ไม่ได้รับอนุญาต (401) โปรดเข้าสู่ระบบใหม่");
-        else setMsg("โหลดร้านไม่สำเร็จ");
+        if (status === 404) {
+          setMsg("ไม่พบร้านของบัญชีนี้ (404)");
+          setShop(null);
+        } else if (status === 401) {
+          setMsg("เซสชันหมดอายุ โปรดเข้าสู่ระบบใหม่");
+          setShop(null);
+          // ล้าง token ที่เสีย
+          await AsyncStorage.removeItem("token");
+          // ถ้ามี action logout ให้ปลดคอมเมนต์:
+          // dispatch(logout());
+        } else {
+          setMsg("โหลดร้านไม่สำเร็จ");
+          setShop(null);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
     run();
-    return () => {
-      cancelled = true;
-    };
-  }, [vendorId, bearer]);
+    return () => { cancelled = true; };
+  }, [vendorId, bearer, hasToken]);
 
-  // กำลังโหลด
+  // ---------- Render ----------
+  if (!hasToken) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 8, textAlign: "center" }}>
+          {msg || "กำลังออกจากระบบ…"}
+        </Text>
+      </View>
+    );
+  }
+
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -109,7 +135,6 @@ export default function V_ButtonNav() {
     );
   }
 
-  // ไม่พบร้าน / มีข้อความแจ้งเตือน
   if (!shop) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
@@ -117,7 +142,6 @@ export default function V_ButtonNav() {
       </View>
     );
   }
-
 
   const shopId = shop?.id || shop?.shop_id || "";
   if (!shopId) {
@@ -128,6 +152,5 @@ export default function V_ButtonNav() {
     );
   }
 
-  // ✅ ส่งต่อเข้า AppTabs ทันที
   return <AppTabs shopId={String(shopId)} />;
 }

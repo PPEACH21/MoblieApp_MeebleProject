@@ -28,8 +28,10 @@ const authSlice = createSlice({
       state.error = action.payload;
     },
     logout: (state) => {
-      state.user = null;
-      state.token = null;
+      state.user = null
+      state.verified = null
+      state.role = null
+      state.token = null
     },
   },
 });

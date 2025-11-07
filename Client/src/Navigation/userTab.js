@@ -9,7 +9,6 @@ import { BaseColor } from "../components/Color";
 // ✅ import หน้าหลักของ user
 import U_Home from "./../User/pages/U_Home";
 import UserOrderScreen from "./../User/pages/UserOrder";
-import UserReserveScreen from "./../User/pages/UserReservation";
 import UserSettingScreen from "./../User/pages/UserSetting";
 
 const Tab = createBottomTabNavigator();

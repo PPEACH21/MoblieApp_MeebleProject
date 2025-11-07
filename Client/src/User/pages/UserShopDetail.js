@@ -21,6 +21,7 @@ import {
   Linking,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BaseColor as c } from "../../components/Color";
 import { api } from "../../axios";
 
@@ -34,13 +35,6 @@ const fmtTHB = (n) =>
     maximumFractionDigits: 0,
   });
 
-const formatPriceRange = (min, max) => {
-  if (min == null && max == null) return "–";
-  const a = toNum(min ?? max);
-  const b = toNum(max ?? min);
-  return a === b ? fmtTHB(a) : `${fmtTHB(a)} – ${fmtTHB(b)}`;
-};
-
 const normalizeShop = (raw) => ({
   id: raw.id || raw.shop_id || raw.shopId || raw.docId,
   shop_name: raw.shop_name || raw.name || "ร้านไม่ระบุชื่อ",
@@ -52,7 +46,7 @@ const normalizeShop = (raw) => ({
   price_max: raw.price_max ?? raw.max_price ?? null,
   rate: toNum(raw.rate ?? raw.rating ?? 0),
   order_active: !!(raw.order_active ?? raw.orderActive ?? true),
-  reserve_active: !!(raw.reserve_active ?? raw.reserveActive ?? false),
+  // 🔥 ตัด reserve_active และทุกอย่างเกี่ยวกับการจองออกแล้ว
   address: raw.address || raw.location || null,
 });
 
@@ -73,6 +67,48 @@ const normalizeMenuItem = (raw) => ({
 const placeholder =
   "https://sandermechanical.com/wp-content/uploads/2016/02/shop-placeholder-300x300.png";
 
+/* ---------- cart helpers (per shopId) ---------- */
+const cartKey = (shopId) => `cart:${shopId}`;
+
+async function loadCart(shopId) {
+  try {
+    const raw = await AsyncStorage.getItem(cartKey(shopId));
+    return raw ? JSON.parse(raw) : { items: [], totalQty: 0, total: 0 };
+  } catch {
+    return { items: [], totalQty: 0, total: 0 };
+  }
+}
+
+async function saveCart(shopId, cart) {
+  await AsyncStorage.setItem(cartKey(shopId), JSON.stringify(cart));
+}
+
+async function addToCart(shopId, menuItem, qty) {
+  const n = Math.max(1, Number(qty) || 1);
+  const cart = await loadCart(shopId);
+
+  const idx = cart.items.findIndex((it) => it.id === menuItem.id);
+  if (idx >= 0) {
+    cart.items[idx].qty += n;
+    cart.items[idx].subtotal = cart.items[idx].qty * cart.items[idx].price;
+  } else {
+    cart.items.push({
+      id: menuItem.id,
+      name: menuItem.name,
+      price: menuItem.price,
+      image: menuItem.image,
+      qty: n,
+      subtotal: n * menuItem.price,
+    });
+  }
+
+  cart.totalQty = cart.items.reduce((s, it) => s + it.qty, 0);
+  cart.total = cart.items.reduce((s, it) => s + it.subtotal, 0);
+
+  await saveCart(shopId, cart);
+  return cart;
+}
+
 /* ---------- main component ---------- */
 export default function UserShopDetail() {
   const nav = useNavigation();
@@ -91,6 +127,9 @@ export default function UserShopDetail() {
   const [selectedMenu, setSelectedMenu] = useState(null);
   const [qty, setQty] = useState("1");
 
+  // cart state (derived from storage)
+  const [cartSummary, setCartSummary] = useState({ totalQty: 0, total: 0 });
+
   useLayoutEffect(() => {
     nav.setOptions({
       title: shop?.shop_name ? shop.shop_name : "รายละเอียดร้าน",
@@ -100,6 +139,12 @@ export default function UserShopDetail() {
       headerTintColor: c.fullwhite,
     });
   }, [nav, shop]);
+
+  const refreshCartSummary = useCallback(async () => {
+    if (!shopId) return;
+    const cart = await loadCart(shopId);
+    setCartSummary({ totalQty: cart.totalQty, total: cart.total });
+  }, [shopId]);
 
   const fetchShop = useCallback(async () => {
     if (!shopId) return;
@@ -144,6 +189,10 @@ export default function UserShopDetail() {
     fetchMenus();
   }, [fetchMenus]);
 
+  useEffect(() => {
+    refreshCartSummary();
+  }, [refreshCartSummary]);
+
   const openInMaps = useCallback(() => {
     const lat = shop?.address?.latitude;
     const lng = shop?.address?.longitude;
@@ -161,15 +210,21 @@ export default function UserShopDetail() {
     setQtyModalVisible(true);
   };
 
-  const handleConfirmQty = () => {
+  const handleConfirmQty = async () => {
     const n = Math.max(1, parseInt(qty, 10) || 1);
-    setQtyModalVisible(false);
-    Alert.alert(
-      "เพิ่มลงตะกร้า",
-      `${selectedMenu?.name} × ${n}\nราคารวม: ${fmtTHB(
-        (selectedMenu?.price || 0) * n
-      )}`
-    );
+    try {
+      setQtyModalVisible(false);
+      await addToCart(shopId, selectedMenu, n);
+      await refreshCartSummary();
+      Alert.alert(
+        "เพิ่มลงตะกร้าแล้ว",
+        `${selectedMenu?.name} × ${n}\nราคารวมตะกร้า: ${fmtTHB(
+          (cartSummary.total || 0) + (selectedMenu?.price || 0) * n
+        )}`
+      );
+    } catch (e) {
+      Alert.alert("ไม่สามารถเพิ่มตะกร้า", String(e?.message || e || "เกิดข้อผิดพลาด"));
+    }
   };
 
   const statusBadge = useMemo(() => {
@@ -244,6 +299,8 @@ export default function UserShopDetail() {
           <Text style={styles.sectionTitle}>เมนู</Text>
           {menusLoading ? (
             <ActivityIndicator color={c.S2} />
+          ) : menusErr ? (
+            <Text style={{ color: "#991b1b" }}>{menusErr}</Text>
           ) : (
             <View style={styles.menuGrid}>
               {menus.map((m) => (
@@ -272,7 +329,24 @@ export default function UserShopDetail() {
         </View>
       </ScrollView>
 
-      {/* modal */}
+      {/* floating mini-cart */}
+      {!!cartSummary.totalQty && (
+        <Pressable
+          onPress={() =>
+            // 🔁 เปลี่ยนชื่อ route "Cart" ให้ตรงกับของคุณ
+            nav.navigate("Cart", { shopId })
+          }
+          style={styles.cartFloat}
+        >
+          <Text style={styles.cartFloatQty}>{cartSummary.totalQty}</Text>
+          <View style={{ marginLeft: 8 }}>
+            <Text style={styles.cartFloatTitle}>ดูตะกร้า</Text>
+            <Text style={styles.cartFloatTotal}>{fmtTHB(cartSummary.total)}</Text>
+          </View>
+        </Pressable>
+      )}
+
+      {/* modal เลือกจำนวน */}
       <Modal
         transparent
         visible={qtyModalVisible}
@@ -299,9 +373,7 @@ export default function UserShopDetail() {
 
             <TextInput
               value={qty}
-              onChangeText={(t) =>
-                setQty(t.replace(/[^0-9]/g, "") || "1")
-              }
+              onChangeText={(t) => setQty(t.replace(/[^0-9]/g, "") || "1")}
               keyboardType="number-pad"
               style={styles.qtyInput}
             />
@@ -404,6 +476,7 @@ const styles = StyleSheet.create({
   menuDesc: { color: "#64748b", fontSize: 12, marginVertical: 2 },
   menuPrice: { color: c.S2, fontWeight: "800" },
 
+  // modal
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.25)",
@@ -453,4 +526,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalBtnTxt: { fontWeight: "800" },
+
+  // floating cart
+  cartFloat: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 20,
+    backgroundColor: c.black,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  cartFloatQty: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: c.fullwhite,
+    color: c.black,
+    textAlign: "center",
+    textAlignVertical: "center",
+    fontWeight: "800",
+    overflow: "hidden",
+  },
+  cartFloatTitle: { color: c.fullwhite, fontWeight: "800" },
+  cartFloatTotal: { color: c.fullwhite, opacity: 0.9, fontSize: 12 },
 });

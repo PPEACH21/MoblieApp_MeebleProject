@@ -15,8 +15,9 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
-import { useSelector } from "react-redux";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import { useSelector, useDispatch } from "react-redux";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "../axios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -24,6 +25,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
 import { BaseColor } from "../components/Color";
+import { logout } from "../redux/slices/authSlice";
 
 /* ---------- constants ---------- */
 const STATUS_OPEN = "open";
@@ -279,6 +281,9 @@ async function uploadToImgbb(base64) {
 /* ---------- component ---------- */
 export default function HomeShop(props) {
   const route = useRoute();
+  const nav = useNavigation();
+  const dispatch = useDispatch();
+
   const shopId = route?.params?.shopId ?? props?.shopId ?? "";
 
   // token จาก Redux (ไม่มี Firebase Auth)
@@ -301,6 +306,21 @@ export default function HomeShop(props) {
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+
+  const Dispath = useDispatch()
+  /* ---------- LOGOUT ---------- */
+  const handleLogout = async () => {
+    try {
+      // เคลียร์ token ใน storage (ปรับชื่อ key ให้ตรงกับของคุณ)
+      await AsyncStorage.removeItem("token");
+      // ล้าง Redux auth
+      Dispath(logout())// ← ใช้ reducer ด้านล่างที่ให้ไว้
+      // นำทางกลับหน้า Login (เปลี่ยนชื่อ route ให้ตรงกับของคุณ)
+      nav.reset({ index: 0, routes: [{ name: "Splash" }] });
+    } catch (e) {
+      Alert.alert("ออกจากระบบไม่สำเร็จ", e?.message || "ไม่สามารถลบ token ได้");
+    }
+  };
 
   /* ---------- fetch shop ---------- */
   const fetchShop = useCallback(async () => {
@@ -538,9 +558,22 @@ export default function HomeShop(props) {
 
         <View style={styles.headerRow}>
           <Text style={baseStyles.title}>ร้านของฉัน</Text>
-          <Pressable onPress={openEditModal} style={styles.primaryBtn}>
-            <Text style={styles.primaryText}>แก้ไขร้าน</Text>
-          </Pressable>
+
+          {/* ปุ่มแก้ไข + ปุ่มออกจากระบบ */}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable onPress={openEditModal} style={styles.primaryBtn}>
+              <Text style={styles.primaryText}>แก้ไขร้าน</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleLogout}
+              style={[styles.ghostBtn, { backgroundColor: BaseColor.red }]}
+            >
+              <Text style={[styles.ghostText, { color: BaseColor.fullwhite }]}>
+                ออกจากระบบ
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={baseStyles.card}>
