@@ -1,12 +1,12 @@
 // src/redux/actions/authActions.js
-import axios from "../../api/axios";
+import { api } from "../../api/axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loginFailed,loginSuccess, registerSuccess,registerFailed, loadingProcess } from "../slices/authSlice";
 
 export const loginUser = (credentials) => async (dispatch) => {
   try {
     dispatch(loadingProcess());
-    const res = await axios.post(`/login`, credentials);
+    const res = await api.post(`/login`, credentials);
     await AsyncStorage.setItem("access_token", res.data.token);
     dispatch(loginSuccess(res.data));
   } catch (err) {
@@ -16,11 +16,10 @@ export const loginUser = (credentials) => async (dispatch) => {
 };
 
 
-export const registerID = (data,role) => async (dispatch) => {
+export const registerID = (data) => async (dispatch) => {
   try {
     dispatch(loadingProcess());
-    const res = await axios.post(`/register`, { ...data, Role:"user" });
-    
+    const res = await api.post(`/register`, { ...data});
     if (res.data.token) {
       await AsyncStorage.setItem("access_token", res.data.token);
     }

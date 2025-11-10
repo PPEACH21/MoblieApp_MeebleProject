@@ -19,7 +19,7 @@ if (!extra?.apiBase) {
   );
 }
 
-export const API_BASE = `${extra.apiBase}`; // คุณตั้ง apiBase = http://IP:PORT (ไม่มี /api)
+export const API_BASE = `${extra.apiBase}`;
 console.log("🌐 API_BASE =", API_BASE);
 
 export const api = axios.create({

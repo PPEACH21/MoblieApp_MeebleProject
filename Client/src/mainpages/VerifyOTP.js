@@ -5,7 +5,7 @@ import { getProfile } from "../redux/actions/profileAction";
 import { Layout } from "../components/Layout";
 import { Btn } from "../components/Button";
 import { BaseColor as c } from "../components/Color";
-import axios from "../api/axios";
+import { api } from "../api/axios";
 const VerifyOTP = ({ navigation }) => {
  const dispatch = useDispatch();
   const Profile = useSelector((state) => state.profile);
@@ -17,7 +17,7 @@ const VerifyOTP = ({ navigation }) => {
 
   const SendOTPRepassword = async() => {
     try {
-      const res = await axios.post("/sendotp_repassword",{ email:Profile.email });
+      const res = await api.post("/sendotp_repassword",{ email:Profile.email });
       console.log("OTP sent successfully:", res.data);
     } catch (err) {
       console.error("Error sending OTP:", err);
@@ -26,7 +26,7 @@ const VerifyOTP = ({ navigation }) => {
 
   const SendOTP = async () => {
     try {
-      const res = await axios.post(
+      const res = await api.post(
         "/sendotp",
         {
           username: Profile.username,
@@ -76,10 +76,10 @@ const VerifyOTP = ({ navigation }) => {
     if (code.length === 6) {
       try{
         if (Auth) {
-        const res = axios.post("/checkotp",{ otp: code, email: Profile?.email });
+        const res = api.post("/checkotp",{ otp: code, email: Profile?.email });
         console.log("checkOTP Success", res?.status);
         
-        const updatadata = await axios.put(
+        const updatadata = await api.put(
           `/verifiedEmail/${Auth?.user}`,
           {},{headers: { Authorization: `Bearer ${Auth.token}` },}
         );
@@ -90,7 +90,7 @@ const VerifyOTP = ({ navigation }) => {
           navigation.navigate("HomeUser")
         }
       }else{
-        const res = await axios.post(`/checkotp`, { otp: code, email:Profile.email });
+        const res = await api.post(`/checkotp`, { otp: code, email:Profile.email });
         console.log("checkOTP Success", res?.status);
         console.log("Changepassword Page");
       }
