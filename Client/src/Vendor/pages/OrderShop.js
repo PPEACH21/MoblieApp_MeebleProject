@@ -11,22 +11,27 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { api } from "../axios";
-import { BaseColor as c } from "../components/Color";
+import { api } from "../../axios";
+import { BaseColor as c } from "../../components/Color";
+import { useSelector, useDispatch } from "react-redux";
 
 /* ---------- config ---------- */
-const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
-
-/** สถานะที่รองรับฝั่งระบบ */
 const STATUSES = ["prepare", "ready", "completed"];
-
-/** แท็บกรองบน UI */
 const FILTERS = [
   { key: "all", label: "ทั้งหมด" },
   { key: "prepare", label: "กำลังทำ" },
   { key: "ready", label: "พร้อมส่ง/รับ" },
   { key: "completed", label: "เสร็จสิ้น" },
 ];
+
+const mapStatus = (s) => {
+  const v = String(s || "").toLowerCase();
+  if (["prepare", "preparing", "processing"].includes(v)) return "prepare";
+  if (["ready", "ongoing", "shipping", "to-deliver"].includes(v)) return "ready";
+  if (["completed", "complete", "done", "success", "delivered"].includes(v))
+    return "completed";
+  return v;
+};
 
 /* ---------- helpers ---------- */
 const toErr = (e, fallback = "เกิดข้อผิดพลาด") => {
@@ -68,7 +73,6 @@ const currencyTHB = (n) =>
     maximumFractionDigits: 0,
   });
 
-/** รวมยอดจาก items ได้หลายทรง */
 const computeTotal = (order) => {
   const items = order?.raw?.items || order?.items || [];
   let sum = 0;
@@ -81,7 +85,6 @@ const computeTotal = (order) => {
   return sum;
 };
 
-/** ทำให้ทรง order สม่ำเสมอ */
 const normalizeOrders = (data) => {
   let list = [];
   if (!data) return list;
@@ -89,13 +92,12 @@ const normalizeOrders = (data) => {
   else if (Array.isArray(data.orders)) list = data.orders;
   else if (Array.isArray(data.items)) list = data.items;
   else if (Array.isArray(data.data)) list = data.data;
+  else if (Array.isArray(data.history)) list = data.history; // <— รองรับ key "history" จาก /history
 
   return (list || []).map((o, i) => {
     const id = o.id || o.ID || o.order_id || String(i);
-    const rawStatus = String(
-      o.status || o.state || o.order_status || "prepare"
-    ).toLowerCase();
-    const status = STATUSES.includes(rawStatus) ? rawStatus : rawStatus; // สถานะนอกเหนือ 3 ตัวหลักจะขึ้นใน "ทั้งหมด"
+    const rawStatus = o.status || o.state || o.order_status || "prepare";
+    const status = mapStatus(rawStatus);
     const createdAt = o.createdAt || o.created_at || o.time || o.timestamp;
     const customer =
       o.customerName ||
@@ -111,41 +113,57 @@ const normalizeOrders = (data) => {
       ) || 0;
     const total = computeTotal(o);
 
-    return {
-      ...o,
-      id,
-      status,
-      createdAt,
-      customer,
-      itemsCount,
-      total,
-    };
+    return { ...o, id, status, createdAt, customer, itemsCount, total };
   });
 };
 
-/* ---------- UI helpers (ใช้ BaseColor) ---------- */
+/* ---------- UI helpers ---------- */
 const chipColor = (status) => {
-  // ใช้โทนส้มเป็นหลัก + เขียวเมื่อเสร็จสิ้น
   switch (status) {
     case "prepare":
-      return { bg: c.S3, fg: c.S5 };     // ส้มอ่อน + ตัวอักษรส้มเข้ม
+      return { bg: c.S3, fg: c.S5 };
     case "ready":
-      return { bg: c.S2, fg: c.fullwhite }; // ส้มสด + ตัวอักษรขาว
+      return { bg: c.S2, fg: c.fullwhite };
     case "completed":
-      return { bg: "rgba(43,116,36,0.12)", fg: c.green }; // เขียวอ่อนโปร่ง + เขียวแบรนด์
+      return { bg: "rgba(43,116,36,0.12)", fg: c.green };
     default:
-      return { bg: c.S4, fg: c.black };  // จาง ๆ อ่านง่าย
+      return { bg: c.S4, fg: c.black };
   }
 };
 
-/* ---------- main component ---------- */
+/* ---------- component ---------- */
 export default function OrderShop() {
   const [filter, setFilter] = useState("all");
   const [orders, setOrders] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState(null);
-  const [acting, setActing] = useState({}); // map orderId -> bool
+  const [acting, setActing] = useState({});
+  const [shopId, setShopId] = useState();
+  const [view, setView] = useState("orders"); // 'orders' | 'history'
+
+  const Dispath = useDispatch();
+  const Auth = useSelector((state) => state.auth);
+  const headers = Auth.token ? { Authorization: `Bearer ${Auth.token}` } : undefined;
+
+  const getShopId = useCallback(async () => {
+    if (!Auth?.user || !Auth?.token) return;
+    try {
+      const { data } = await api.get(`/shop/by-id/${Auth.user}`, { headers });
+      setShopId(data?.id ?? null);
+    } catch (e) {
+      console.log("Could not find shop for user", e?.message);
+      setShopId(null);
+    }
+  }, [Auth?.user, Auth?.token]);
+
+  useEffect(() => {
+    getShopId();
+  }, [getShopId]);
+
+  const SHOP_ID = shopId;
 
   const fetchOrders = useCallback(async () => {
     if (!SHOP_ID) return;
@@ -158,11 +176,7 @@ export default function OrderShop() {
 
       let res;
       try {
-        res = await api.get(`/shops/${SHOP_ID}/orders`, {
-          params,
-          withCredentials: true,
-          headers: { "Cache-Control": "no-cache" },
-        });
+        res = await api.get(`/shop/${SHOP_ID}/orders`, { headers, params });
       } catch (e1) {
         if (e1?.response?.status === 404) {
           setOrders([]);
@@ -172,11 +186,7 @@ export default function OrderShop() {
           return;
         }
         try {
-          res = await api.get(`/shop/${SHOP_ID}/orders`, {
-            params,
-            withCredentials: true,
-            headers: { "Cache-Control": "no-cache" },
-          });
+          res = await api.get(`/shops/${SHOP_ID}/orders`, { headers, params });
         } catch (e2) {
           if (e2?.response?.status === 404) {
             setOrders([]);
@@ -201,16 +211,40 @@ export default function OrderShop() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filter]);
+  }, [SHOP_ID, filter, Auth?.token]);
 
+  const fetchHistory = useCallback(async () => {
+    if (!SHOP_ID) return;
+    try {
+      setErr(null);
+      setLoadingHistory(true);
+      const res = await api.get(`/shop/${SHOP_ID}/history`, { headers });
+      const list = normalizeOrders(res?.data?.history ?? res?.data);
+      setHistory(list);
+    } catch (e) {
+      setErr(toErr(e, "โหลดประวัติไม่สำเร็จ"));
+      setHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [SHOP_ID, Auth?.token]);
+
+  // โหลดตามมุมมอง
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (!SHOP_ID) return;
+    if (view === "orders") fetchOrders();
+    else fetchHistory();
+  }, [SHOP_ID, view, fetchOrders, fetchHistory]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchOrders();
-  }, [fetchOrders]);
+    const run = view === "orders" ? fetchOrders : fetchHistory;
+    if (!SHOP_ID) {
+      getShopId().finally(() => run().finally(() => setRefreshing(false)));
+    } else {
+      run().finally(() => setRefreshing(false));
+    }
+  }, [SHOP_ID, view, fetchOrders, fetchHistory, getShopId]);
 
   /* ---------- actions: update status ---------- */
   const updateStatus = async (orderId, next) => {
@@ -222,19 +256,24 @@ export default function OrderShop() {
 
       const body = { status: next };
       try {
-        await api.put(`/orders/${orderId}/status`, body);
+        await api.put(`/orders/${orderId}/status`, body, { headers });
       } catch {
         try {
-          await api.put(`/shops/${SHOP_ID}/orders/${orderId}/status`, body);
+          await api.put(`/shops/${SHOP_ID}/orders/${orderId}/status`, body, { headers });
         } catch {
-          await api.put(`/shop/${SHOP_ID}/orders/${orderId}/status`, body);
+          await api.put(`/shop/${SHOP_ID}/orders/${orderId}/status`, body, { headers });
         }
       }
 
-      // optimistic update
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: next } : o))
-      );
+      if (next === "completed") {
+        setView("history");     // สลับไปโหมดประวัติทันที
+        await fetchHistory();   // แล้วดึงประวัติ
+      } else {
+        // อื่น ๆ อัปเดตลิสต์ปัจจุบันแบบ optimistic
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, status: next } : o))
+        );
+      }
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะออเดอร์ไม่สำเร็จ");
       Alert.alert(
@@ -259,7 +298,7 @@ export default function OrderShop() {
           paddingVertical: 9,
           borderRadius: 10,
           marginLeft: 8,
-          backgroundColor: c.S5, // ปุ่มโทนส้มเข้ม
+          backgroundColor: c.S5,
           opacity: busy ? 0.6 : 1,
         }}
       >
@@ -296,7 +335,7 @@ export default function OrderShop() {
           borderRadius: 14,
           marginBottom: 10,
           borderWidth: 1,
-          borderColor: c.S3, // เส้นขอบส้มอ่อน
+          borderColor: c.S3,
         }}
       >
         {/* header row */}
@@ -316,7 +355,7 @@ export default function OrderShop() {
               paddingVertical: 6,
               borderRadius: 999,
               backgroundColor: bg,
-              borderWidth: bg === c.S2 ? 0 : 1, // ชิปอ่อนมีเส้นขอบบาง
+              borderWidth: bg === c.S2 ? 0 : 1,
               borderColor: bg === c.S2 ? "transparent" : c.S3,
             }}
           >
@@ -384,7 +423,7 @@ export default function OrderShop() {
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 999,
-              backgroundColor: active ? c.S2 : c.S3, // โทนส้ม
+              backgroundColor: active ? c.S2 : c.S3,
               borderWidth: active ? 0 : 1,
               borderColor: c.S3,
             }}
@@ -413,60 +452,128 @@ export default function OrderShop() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.fullwhite }} edges={["top"]}>
       <StatusBar style="dark" />
+
+      {/* Header + toggle view */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
         <Text style={{ fontSize: 20, fontWeight: "900", color: c.black }}>
-          ออเดอร์ร้าน
+          {view === "orders" ? "ออเดอร์ร้าน" : "ประวัติออเดอร์"}
         </Text>
         <Text style={{ color: c.black, opacity: 0.7, marginTop: 2 }}>
-          {filter === "all" ? "ทุกรายการ" : `สถานะ: ${filter}`} • {totals.count} ออเดอร์ • รวม {currencyTHB(totals.sum)}
+          {view === "orders"
+            ? `${filter === "all" ? "ทุกรายการ" : `สถานะ: ${filter}`} • ${totals.count} ออเดอร์ • รวม ${currencyTHB(totals.sum)}`
+            : `รวม ${history.length} รายการ`}
         </Text>
-      </View>
 
-      <Tabs />
-
-      {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" color={c.S2} />
-          <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>กำลังโหลดออเดอร์…</Text>
-        </View>
-      ) : err ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
-          {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
-          <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>
-            {err.message}
-          </Text>
+        <View style={{ flexDirection: "row", marginTop: 8 }}>
           <Pressable
-            onPress={fetchOrders}
+            onPress={() => { setView("orders"); fetchOrders(); }}
             style={{
-              marginTop: 12,
-              backgroundColor: c.S2,
-              paddingHorizontal: 14,
-              paddingVertical: 8,
-              borderRadius: 10,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 8,
+              backgroundColor: view === "orders" ? c.S2 : c.S3,
+              marginRight: 8,
             }}
           >
-            <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
+            <Text style={{ color: view === "orders" ? c.fullwhite : c.black, fontWeight: "800" }}>
+              ออเดอร์
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => { setView("history"); fetchHistory(); }}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 8,
+              backgroundColor: view === "history" ? c.S2 : c.S3,
+            }}
+          >
+            <Text style={{ color: view === "history" ? c.fullwhite : c.black, fontWeight: "800" }}>
+              ประวัติ
+            </Text>
           </Pressable>
         </View>
+      </View>
+
+      {/* Tabs เฉพาะโหมดออเดอร์ */}
+      {view === "orders" ? <Tabs /> : null}
+
+      {/* Lists */}
+      {view === "orders" ? (
+        loading ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator size="large" color={c.S2} />
+            <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
+              กำลังโหลดออเดอร์…
+            </Text>
+          </View>
+        ) : err ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+            {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
+            <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>{err.message}</Text>
+            <Pressable
+              onPress={fetchOrders}
+              style={{ marginTop: 12, backgroundColor: c.S2, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
+            >
+              <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={orders}
+            keyExtractor={(o, i) => String(o.id || i)}
+            renderItem={renderItem}
+            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 20 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />
+            }
+            ListEmptyComponent={() => (
+              <View style={{ alignItems: "center", marginTop: 24 }}>
+                <Text style={{ color: c.black, opacity: 0.7 }}>ไม่มีออเดอร์ขณะนี้</Text>
+              </View>
+            )}
+          />
+        )
       ) : (
-        <FlatList
-          data={orders}
-          keyExtractor={(o, i) => String(o.id || i)}
-          renderItem={renderItem}
-          contentContainerStyle={{
-            padding: 16,
-            paddingTop: 6,
-            paddingBottom: 20,
-          }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />
-          }
-          ListEmptyComponent={() => (
-            <View style={{ alignItems: "center", marginTop: 24 }}>
-              <Text style={{ color: c.black, opacity: 0.7 }}>ไม่มีออเดอร์ขณะนี้</Text>
-            </View>
-          )}
-        />
+        // HISTORY VIEW
+        loadingHistory ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator size="large" color={c.S2} />
+            <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
+              กำลังโหลดประวัติ…
+            </Text>
+          </View>
+        ) : err ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+            {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
+            <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>{err.message}</Text>
+            <Pressable
+              onPress={fetchHistory}
+              style={{ marginTop: 12, backgroundColor: c.S2, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
+            >
+              <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={history}
+            keyExtractor={(o, i) => String(o.id || i)}
+            renderItem={renderItem}
+            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 20 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[c.S2]}
+              />
+            }
+            ListEmptyComponent={() => (
+              <View style={{ alignItems: "center", marginTop: 24 }}>
+                <Text style={{ color: c.black, opacity: 0.7 }}>ยังไม่มีประวัติ</Text>
+              </View>
+            )}
+          />
+        )
       )}
     </SafeAreaView>
   );

@@ -15,10 +15,10 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
-import { api } from "../axios";
+import { api } from "../../axios";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { styles } from "../Styles/createShopStyle";
+import { styles } from "../../Styles/createShopStyle";
 
 /* ---------- constants ---------- */
 const TYPES = ["Appetizer", "Beverage", "Fast food", "Main course", "Dessert"];

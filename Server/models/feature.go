@@ -14,8 +14,8 @@ type OrderItem struct {
 
 type Order struct {
 	ID         string      `json:"id" firestore:"-"` // Firestore DocID
-	ShopID     string      `json:"shop_id" firestore:"shop_id"`
-	CustomerID string      `json:"customer_id" firestore:"customer_id"`
+	ShopID     string      `json:"shop_id" firestore:"shopId"`
+	CustomerID string      `json:"customer_id" firestore:"customerId"`
 	Status     string      `json:"status" firestore:"status"`
 	Items      []OrderItem `json:"items" firestore:"items"`
 	Note       string      `json:"note,omitempty" firestore:"note,omitempty"`

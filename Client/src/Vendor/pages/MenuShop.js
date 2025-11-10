@@ -1,20 +1,33 @@
 // src/Vendor/MenuShop.jsx
 import React, { useCallback, useState } from "react";
 import {
-  View, Text, FlatList, ActivityIndicator, Image, Pressable, Modal,
-  TextInput, Alert, Keyboard, TouchableWithoutFeedback,
-  KeyboardAvoidingView, Platform, ScrollView,
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  Modal,
+  TextInput,
+  Alert,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
-import { api } from "../axios";
-import { BaseColor as c } from "../components/Color";
+import { api } from "../../axios";
+import { useDispatch, useSelector } from "react-redux";
+import { BaseColor as c } from "../../components/Color";
+import { useEffect } from "react";
 
 /* ---------- config ---------- */
-const { imgbbKey } = (Constants?.expoConfig?.extra ?? {});
+const { imgbbKey } = Constants?.expoConfig?.extra ?? {};
 const IMGBB_API_KEY = imgbbKey || "";
 
 /* ---------- helpers ---------- */
@@ -43,7 +56,8 @@ async function uriToBase64(uri) {
       encoding: FileSystem.EncodingType.Base64,
     });
   } catch {
-    const filename = uri.split("/").pop()?.split("?")[0] || `picked_${Date.now()}.jpg`;
+    const filename =
+      uri.split("/").pop()?.split("?")[0] || `picked_${Date.now()}.jpg`;
     const dest = FileSystem.cacheDirectory + filename;
     await FileSystem.copyAsync({ from: uri, to: dest });
     return await FileSystem.readAsStringAsync(dest, {
@@ -54,14 +68,21 @@ async function uriToBase64(uri) {
 
 // upload to imgbb
 async function uploadToImgbb(base64) {
-  if (!IMGBB_API_KEY) throw new Error("ยังไม่ได้ตั้งค่า imgbbKey ใน app.config.js");
+  if (!IMGBB_API_KEY)
+    throw new Error("ยังไม่ได้ตั้งค่า imgbbKey ใน app.config.js");
   const fd = new FormData();
   fd.append("key", IMGBB_API_KEY);
   fd.append("image", base64);
-  const res = await fetch("https://api.imgbb.com/1/upload", { method: "POST", body: fd });
+  const res = await fetch("https://api.imgbb.com/1/upload", {
+    method: "POST",
+    body: fd,
+  });
   const json = await res.json();
   if (!json?.success) {
-    const msg = json?.error?.message || json?.data?.error?.message || "อัปโหลดรูปไป imgbb ไม่สำเร็จ";
+    const msg =
+      json?.error?.message ||
+      json?.data?.error?.message ||
+      "อัปโหลดรูปไป imgbb ไม่สำเร็จ";
     throw new Error(msg);
   }
   return json?.data?.display_url || json?.data?.url;
@@ -78,7 +99,8 @@ function normalizeMenuResponse(data) {
     return data.docs.map((d) => ({ id: d.id || d.ID, ...(d.data || d) }));
   }
   if (typeof data === "object") {
-    const maybeItem = data.item || data.menuItem || data.items || data.data || null;
+    const maybeItem =
+      data.item || data.menuItem || data.items || data.data || null;
     if (maybeItem && !Array.isArray(maybeItem)) return [maybeItem];
   }
   return [];
@@ -89,9 +111,13 @@ const getId = (it) => it?.id || it?.ID || it?._id || null;
 
 /* ---------- component ---------- */
 export default function MenuShop() {
+  const Dispath = useDispatch();
+  const Auth = useSelector((state) => state.auth);
+  const headers = Auth.token
+    ? { Authorization: `Bearer ${Auth.token}` }
+    : undefined;
   const route = useRoute();
-  const shopId = "qIcsHxOuL5uAtW4TwAeV";
-
+  const [shopId, setShopId] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -102,12 +128,40 @@ export default function MenuShop() {
   const [mode, setMode] = useState("create"); // "create" | "edit"
   const [editingId, setEditingId] = useState(null);
 
-  const [form, setForm] = useState({ name: "", price: "", image: "", description: "" });
+  const [form, setForm] = useState({
+    name: "",
+    price: "",
+    image: "",
+    description: "",
+  });
   const [localImageUri, setLocalImageUri] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const getShopId = useCallback(async () => {
+    if (!Auth.user) {
+      console.log("No user to fetch shop for");
+      return;
+    }
+    try {
+      const response = await api.get(`/shop/by-id/${Auth.user}`, {
+        headers: headers,
+      });
+      console.log("ShopId",response.data.id);
+      setShopId(response.data.id);
+    } catch (e) {
+      console.log("Could not find shop for user", e.message);
+      setShopId(null);
+    }
+  }, [api, Auth.user]);
+
+  useEffect(() => {
+    getShopId();
+    console.log("The shopId has changed:", shopId);
+  }, [getShopId]);
+
   const fetchMenu = useCallback(async () => {
+    console.log("get",shopId)
     if (!shopId) {
       setErr({ message: "ไม่พบ shopId" });
       setLoading(false);
@@ -117,9 +171,7 @@ export default function MenuShop() {
     try {
       setErr(null);
       const { data } = await api.get(`/shop/${shopId}/menu`, {
-        withCredentials: true,
-        headers: { "Cache-Control": "no-cache" },
-        params: { _ts: Date.now() },
+        headers: headers,
       });
       const list = normalizeMenuResponse(data);
       setItems(Array.isArray(list) ? list : []);
@@ -197,9 +249,7 @@ export default function MenuShop() {
       // optimistic remove
       setItems((prev) => prev.filter((x) => getId(x) !== menuId));
 
-      await api.delete(`/shop/${shopId}/menu/${menuId}`, {
-        withCredentials: true,
-      });
+      await api.delete(`/shop/${shopId}/menu/${menuId}`, { headers: headers });
 
       await fetchMenu();
     } catch (e) {
@@ -215,9 +265,13 @@ export default function MenuShop() {
   /* ---------- Image Picker ---------- */
   const onPickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("ต้องการสิทธิ์เข้าถึงรูปภาพ", "โปรดอนุญาตการเข้าถึงคลังรูปภาพ");
+        Alert.alert(
+          "ต้องการสิทธิ์เข้าถึงรูปภาพ",
+          "โปรดอนุญาตการเข้าถึงคลังรูปภาพ"
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -271,10 +325,14 @@ export default function MenuShop() {
 
       if (mode === "create") {
         const res = await api.post(`/shop/${shopId}/menu`, payload, {
-          withCredentials: true,
+          headers: headers,
         });
         const created =
-          res?.data?.item || res?.data?.data || res?.data?.menuItem || res?.data || null;
+          res?.data?.item ||
+          res?.data?.data ||
+          res?.data?.menuItem ||
+          res?.data ||
+          null;
         if (created && typeof created === "object") {
           setItems((prev) => [created, ...prev]);
         }
@@ -309,9 +367,14 @@ export default function MenuShop() {
       setOpenModal(false);
       await fetchMenu();
     } catch (e) {
-      const er = toErr(e, mode === "create" ? "สร้างเมนูไม่สำเร็จ" : "อัปเดตเมนูไม่สำเร็จ");
+      const er = toErr(
+        e,
+        mode === "create" ? "สร้างเมนูไม่สำเร็จ" : "อัปเดตเมนูไม่สำเร็จ"
+      );
       Alert.alert(
-        `${mode === "create" ? "สร้างเมนูไม่สำเร็จ" : "อัปเดตเมนูไม่สำเร็จ"}${er.status ? ` (HTTP ${er.status})` : ""}`,
+        `${mode === "create" ? "สร้างเมนูไม่สำเร็จ" : "อัปเดตเมนูไม่สำเร็จ"}${
+          er.status ? ` (HTTP ${er.status})` : ""
+        }`,
         er.message
       );
     } finally {
@@ -341,17 +404,28 @@ export default function MenuShop() {
         {img ? (
           <Image
             source={{ uri: img }}
-            style={{ width: 68, height: 68, borderRadius: 12, backgroundColor: c.S3 }}
+            style={{
+              width: 68,
+              height: 68,
+              borderRadius: 12,
+              backgroundColor: c.S3,
+            }}
             resizeMode="cover"
           />
         ) : (
           <View
             style={{
-              width: 68, height: 68, borderRadius: 12,
-              backgroundColor: c.S3, alignItems: "center", justifyContent: "center",
+              width: 68,
+              height: 68,
+              borderRadius: 12,
+              backgroundColor: c.S3,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            <Text style={{ color: c.black, opacity: 0.5, fontSize: 12 }}>ไม่มีรูป</Text>
+            <Text style={{ color: c.black, opacity: 0.5, fontSize: 12 }}>
+              ไม่มีรูป
+            </Text>
           </View>
         )}
 
@@ -360,7 +434,10 @@ export default function MenuShop() {
             {item?.name ?? item?.Name ?? "-"}
           </Text>
           {!!(item?.description ?? item?.Description) && (
-            <Text style={{ color: c.black, opacity: 0.7, marginTop: 2 }} numberOfLines={2}>
+            <Text
+              style={{ color: c.black, opacity: 0.7, marginTop: 2 }}
+              numberOfLines={2}
+            >
               {item?.description ?? item?.Description}
             </Text>
           )}
@@ -370,7 +447,10 @@ export default function MenuShop() {
         </View>
 
         {!!id && (
-          <Pressable onPress={() => confirmDelete(item)} style={{ paddingHorizontal: 10, paddingVertical: 6 }}>
+          <Pressable
+            onPress={() => confirmDelete(item)}
+            style={{ paddingHorizontal: 10, paddingVertical: 6 }}
+          >
             <Text style={{ color: c.red, fontWeight: "700" }}>ลบ</Text>
           </Pressable>
         )}
@@ -385,9 +465,16 @@ export default function MenuShop() {
         <View style={{ flex: 1 }}>
           <FlatList
             data={items}
-            keyExtractor={(it, i) => String(getId(it) || `${it?.name || it?.Name}-${i}`)}
+            keyExtractor={(it, i) =>
+              String(getId(it) || `${it?.name || it?.Name}-${i}`)
+            }
             renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: 24, flexGrow: 1, paddingHorizontal: 20, paddingTop: 10 }}
+            contentContainerStyle={{
+              paddingBottom: 24,
+              flexGrow: 1,
+              paddingHorizontal: 20,
+              paddingTop: 10,
+            }}
             refreshing={refreshing}
             onRefresh={onRefresh}
             keyboardShouldPersistTaps="handled"
@@ -402,7 +489,11 @@ export default function MenuShop() {
                   justifyContent: "space-between",
                 }}
               >
-                <Text style={{ fontSize: 20, fontWeight: "800", color: c.black }}>เมนูในร้าน</Text>
+                <Text
+                  style={{ fontSize: 20, fontWeight: "800", color: c.black }}
+                >
+                  เมนูในร้าน
+                </Text>
                 <Pressable
                   onPress={openCreate}
                   style={{
@@ -412,21 +503,41 @@ export default function MenuShop() {
                     borderRadius: 10,
                   }}
                 >
-                  <Text style={{ color: c.fullwhite, fontWeight: "700" }}>+ สร้างเมนู</Text>
+                  <Text style={{ color: c.fullwhite, fontWeight: "700" }}>
+                    + สร้างเมนู
+                  </Text>
                 </Pressable>
               </View>
             }
             ListEmptyComponent={() => (
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 {loading ? (
                   <>
                     <ActivityIndicator size="large" color={c.S2} />
-                    <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>กำลังโหลดเมนู…</Text>
+                    <Text
+                      style={{ marginTop: 8, color: c.black, opacity: 0.7 }}
+                    >
+                      กำลังโหลดเมนู…
+                    </Text>
                   </>
                 ) : err ? (
                   <View style={{ alignItems: "center", paddingHorizontal: 24 }}>
-                    {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
-                    <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>
+                    {!!err.status && (
+                      <Text style={{ color: c.red }}>HTTP {err.status}</Text>
+                    )}
+                    <Text
+                      style={{
+                        color: c.red,
+                        marginTop: 4,
+                        textAlign: "center",
+                      }}
+                    >
                       {err.message}
                     </Text>
                     <Pressable
@@ -439,11 +550,15 @@ export default function MenuShop() {
                         borderRadius: 10,
                       }}
                     >
-                      <Text style={{ color: c.fullwhite, fontWeight: "700" }}>ลองใหม่</Text>
+                      <Text style={{ color: c.fullwhite, fontWeight: "700" }}>
+                        ลองใหม่
+                      </Text>
                     </Pressable>
                   </View>
                 ) : (
-                  <Text style={{ color: c.black, opacity: 0.7 }}>ยังไม่มีเมนู — ปัดลงเพื่อรีเฟรช</Text>
+                  <Text style={{ color: c.black, opacity: 0.7 }}>
+                    ยังไม่มีเมนู — ปัดลงเพื่อรีเฟรช
+                  </Text>
                 )}
               </View>
             )}
@@ -456,14 +571,22 @@ export default function MenuShop() {
             animationType="slide"
             onRequestClose={() => setOpenModal(false)}
           >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <TouchableWithoutFeedback
+              onPress={Keyboard.dismiss}
+              accessible={false}
+            >
               <View
                 style={{
-                  flex: 1, backgroundColor: "rgba(0,0,0,0.25)",
-                  alignItems: "center", justifyContent: "flex-end",
+                  flex: 1,
+                  backgroundColor: "rgba(0,0,0,0.25)",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
                 }}
               >
-                <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%" }}>
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === "ios" ? "padding" : "height"}
+                  style={{ width: "100%" }}
+                >
                   <ScrollView
                     contentContainerStyle={{
                       backgroundColor: c.fullwhite,
@@ -473,19 +596,65 @@ export default function MenuShop() {
                     }}
                     keyboardShouldPersistTaps="handled"
                   >
-                    <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 12, color: c.black }}>
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        fontWeight: "800",
+                        marginBottom: 12,
+                        color: c.black,
+                      }}
+                    >
                       {mode === "create" ? "สร้างเมนูใหม่" : "แก้ไขเมนู"}
                     </Text>
 
                     {/* รูปภาพ + ปุ่มเลือกรูป */}
-                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        marginBottom: 12,
+                      }}
+                    >
                       {localImageUri ? (
-                        <Image source={{ uri: localImageUri }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: c.S3 }} />
+                        <Image
+                          source={{ uri: localImageUri }}
+                          style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: 12,
+                            backgroundColor: c.S3,
+                          }}
+                        />
                       ) : form.image ? (
-                        <Image source={{ uri: form.image }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: c.S3 }} />
+                        <Image
+                          source={{ uri: form.image }}
+                          style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: 12,
+                            backgroundColor: c.S3,
+                          }}
+                        />
                       ) : (
-                        <View style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: c.S3, alignItems: "center", justifyContent: "center" }}>
-                          <Text style={{ color: c.black, opacity: 0.5, fontSize: 12 }}>ไม่มีรูป</Text>
+                        <View
+                          style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: 12,
+                            backgroundColor: c.S3,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: c.black,
+                              opacity: 0.5,
+                              fontSize: 12,
+                            }}
+                          >
+                            ไม่มีรูป
+                          </Text>
                         </View>
                       )}
 
@@ -502,12 +671,20 @@ export default function MenuShop() {
                         disabled={uploadingImage}
                       >
                         <Text style={{ color: c.fullwhite, fontWeight: "700" }}>
-                          {uploadingImage ? "กำลังอัปโหลด…" : (mode === "create" ? "เลือกรูปจากเครื่อง" : "เปลี่ยนรูป")}
+                          {uploadingImage
+                            ? "กำลังอัปโหลด…"
+                            : mode === "create"
+                            ? "เลือกรูปจากเครื่อง"
+                            : "เปลี่ยนรูป"}
                         </Text>
                       </Pressable>
                     </View>
 
-                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>ชื่อเมนู</Text>
+                    <Text
+                      style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}
+                    >
+                      ชื่อเมนู
+                    </Text>
                     <TextInput
                       value={form.name}
                       onChangeText={(t) => setForm((s) => ({ ...s, name: t }))}
@@ -515,12 +692,22 @@ export default function MenuShop() {
                       returnKeyType="done"
                       onSubmitEditing={Keyboard.dismiss}
                       style={{
-                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
-                        paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10, backgroundColor: c.fullwhite, color: c.black,
+                        borderWidth: 1,
+                        borderColor: c.S3,
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        marginBottom: 10,
+                        backgroundColor: c.fullwhite,
+                        color: c.black,
                       }}
                     />
 
-                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>ราคา (บาท)</Text>
+                    <Text
+                      style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}
+                    >
+                      ราคา (บาท)
+                    </Text>
                     <TextInput
                       value={form.price}
                       onChangeText={(t) => setForm((s) => ({ ...s, price: t }))}
@@ -529,12 +716,20 @@ export default function MenuShop() {
                       returnKeyType="done"
                       onSubmitEditing={Keyboard.dismiss}
                       style={{
-                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
-                        paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10, backgroundColor: c.fullwhite, color: c.black,
+                        borderWidth: 1,
+                        borderColor: c.S3,
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        marginBottom: 10,
+                        backgroundColor: c.fullwhite,
+                        color: c.black,
                       }}
                     />
 
-                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>
+                    <Text
+                      style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}
+                    >
                       ลิงก์รูปภาพ (ถูกเติมอัตโนมัติหลังอัปโหลด)
                     </Text>
                     <TextInput
@@ -544,38 +739,68 @@ export default function MenuShop() {
                       autoCapitalize="none"
                       editable={false}
                       style={{
-                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
-                        paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10,
-                        backgroundColor: c.S4, color: c.black, opacity: 0.9,
+                        borderWidth: 1,
+                        borderColor: c.S3,
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        marginBottom: 10,
+                        backgroundColor: c.S4,
+                        color: c.black,
+                        opacity: 0.9,
                       }}
                     />
 
-                    <Text style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}>คำอธิบาย (ไม่บังคับ)</Text>
+                    <Text
+                      style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}
+                    >
+                      คำอธิบาย (ไม่บังคับ)
+                    </Text>
                     <TextInput
                       value={form.description}
-                      onChangeText={(t) => setForm((s) => ({ ...s, description: t }))}
+                      onChangeText={(t) =>
+                        setForm((s) => ({ ...s, description: t }))
+                      }
                       placeholder="รายละเอียดเมนู"
                       multiline
                       blurOnSubmit
                       returnKeyType="done"
                       onSubmitEditing={Keyboard.dismiss}
                       style={{
-                        borderWidth: 1, borderColor: c.S3, borderRadius: 12,
-                        paddingHorizontal: 12, paddingVertical: 10, minHeight: 80, backgroundColor: c.fullwhite, color: c.black,
+                        borderWidth: 1,
+                        borderColor: c.S3,
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        minHeight: 80,
+                        backgroundColor: c.fullwhite,
+                        color: c.black,
                       }}
                     />
 
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 14 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        marginTop: 14,
+                      }}
+                    >
                       {mode === "edit" ? (
                         <Pressable
-                          onPress={() => confirmDelete({ id: editingId, name: form.name })}
+                          onPress={() =>
+                            confirmDelete({ id: editingId, name: form.name })
+                          }
                           style={{
-                            paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderRadius: 10,
                             backgroundColor: "#fee2e2",
                           }}
                           disabled={submitting || uploadingImage}
                         >
-                          <Text style={{ color: "#b91c1c", fontWeight: "700" }}>ลบเมนู</Text>
+                          <Text style={{ color: "#b91c1c", fontWeight: "700" }}>
+                            ลบเมนู
+                          </Text>
                         </Pressable>
                       ) : (
                         <View />
@@ -585,25 +810,38 @@ export default function MenuShop() {
                         <Pressable
                           onPress={() => setOpenModal(false)}
                           style={{
-                            paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
-                            backgroundColor: c.S3, marginRight: 8,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            backgroundColor: c.S3,
+                            marginRight: 8,
                           }}
                           disabled={submitting || uploadingImage}
                         >
-                          <Text style={{ color: c.black, fontWeight: "700" }}>ยกเลิก</Text>
+                          <Text style={{ color: c.black, fontWeight: "700" }}>
+                            ยกเลิก
+                          </Text>
                         </Pressable>
 
                         <Pressable
                           onPress={onSubmit}
                           style={{
-                            paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderRadius: 10,
                             backgroundColor: c.S5, // ส้มเข้มขึ้น
                             opacity: submitting || uploadingImage ? 0.7 : 1,
                           }}
                           disabled={submitting || uploadingImage}
                         >
-                          <Text style={{ color: c.fullwhite, fontWeight: "700" }}>
-                            {submitting ? "กำลังบันทึก…" : (mode === "create" ? "บันทึก" : "อัปเดต")}
+                          <Text
+                            style={{ color: c.fullwhite, fontWeight: "700" }}
+                          >
+                            {submitting
+                              ? "กำลังบันทึก…"
+                              : mode === "create"
+                              ? "บันทึก"
+                              : "อัปเดต"}
                           </Text>
                         </Pressable>
                       </View>

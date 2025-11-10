@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { api } from "../axios";
-import { BaseColor as c } from "../components/Color";
+import { api } from "../../axios";
+import { BaseColor as c } from "../../components/Color";
 
 /* ---------- config ---------- */
 const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -100,19 +101,68 @@ func GetAllShops(c *fiber.Ctx) error {
 func GetShopByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
-		return badRequest(c, "id required")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "vendor id required"})
 	}
 
+	vendorRef := config.Client.Collection("vendors").Doc(id)
+
+	query := config.Client.Collection("shops").
+		Where("vendor_id", "==", vendorRef).
+		Limit(1)
+
+	docs, err := query.Documents(config.Ctx).GetAll()
+	if err != nil {
+		// ✅ --- LOG THE ERROR HERE ---
+		log.Printf("🔥 Firebase query error: %v", err)
+		// ---------------------------------
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "query error"})
+	}
+
+	if len(docs) == 0 {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "shop not found for this user"})
+	}
+
+	d := docs[0]
+	var s models.Shop
+	if err := d.DataTo(&s); err != nil {
+		// ✅ --- AND LOG THE ERROR HERE ---
+		log.Printf("🔥 Firestore DataTo error: %v", err)
+		// ------------------------------------
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "decode error"})
+	}
+
+	if s.VendorRef != nil {
+		s.VendorID = s.VendorRef.ID
+	}
+
+	s.ID = d.Ref.ID
+	return c.JSON(s)
+}
+func GetShopByShopID(c *fiber.Ctx) error {
+	// This 'id' is the shop's document ID (e.g., "aKx9s...")
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "shop id required"})
+	}
 	d, err := config.Client.Collection("shops").Doc(id).Get(config.Ctx)
-	if err != nil || !d.Exists() {
+	if err != nil {
+
+		log.Printf("🔥 Failed to get shop by ID: %v", err)
 		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "shop not found"})
 	}
 
 	var s models.Shop
 	if err := d.DataTo(&s); err != nil {
+		log.Printf("🔥 Firestore DataTo error (GetShopByShopID): %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "decode error"})
 	}
+
+	// 3. Populate the string IDs for the JSON response
+	if s.VendorRef != nil {
+		s.VendorID = s.VendorRef.ID
+	}
 	s.ID = d.Ref.ID
+
 	return c.JSON(s)
 }
 
@@ -435,7 +485,6 @@ func DeleteMenuItem(c *fiber.Ctx) error {
 	})
 }
 
-// คุณมีโมเดล orders อยู่แล้ว สมมุติใช้ models.Order
 func ListAllOrders(c *fiber.Ctx) error {
 	iter := config.Client.Collection(ColOrders).OrderBy("CreatedAt", firestore.Desc).Documents(config.Ctx)
 	docs, err := iter.GetAll()
