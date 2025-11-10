@@ -6,6 +6,7 @@ import { Layout } from "../components/Layout";
 import { Btn } from "../components/Button";
 import { BaseColor as c } from "../components/Color";
 import { api } from "../api/axios";
+import Loading from "./Loading";
 const VerifyOTP = ({ navigation }) => {
  const dispatch = useDispatch();
   const Profile = useSelector((state) => state.profile);
@@ -39,9 +40,11 @@ const VerifyOTP = ({ navigation }) => {
     }
   };
 
-  const sendmessage = () => {
+  const sendmessage =async() => {
     if(Auth){
-      dispatch(getProfile());
+      console.log("CHECK")
+      await dispatch(getProfile());
+      console.log(Profile)
       SendOTP()
     }else{
       SendOTPRepassword()
@@ -138,6 +141,7 @@ const VerifyOTP = ({ navigation }) => {
       >
         <Text style={[Btn.textBtn1]}>ยืนยันรหัส</Text>
       </TouchableOpacity>
+      {Profile.loading&&(<Loading/>)}
     </View>
   );
 
