@@ -22,7 +22,8 @@ import {
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { BaseColor as c } from "../../components/Color";
-import { api } from "../../axios";
+import { api} from "../../api/axios";
+
 
 /* ---------- helpers ---------- */
 const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);

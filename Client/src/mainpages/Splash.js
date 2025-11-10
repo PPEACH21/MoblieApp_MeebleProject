@@ -1,33 +1,27 @@
 import { Text, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback  } from "react-native";
 import { useEffect, useState } from "react";
-import { TEXTinput, TextInputSplash } from "../components/TextInput";
+import { TextInputSplash } from "../components/TextInput";
 import Loading from "./Loading";
 
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withDelay,
-    withSequence,
-    withTiming, useAnimatedReaction,
-    Easing, cubicBezier, useAnimatedKeyboard
-} from "react-native-reanimated";
+import Animated, {useSharedValue,useAnimatedStyle,withDelay,withSequence,withTiming,Easing,cubicBezier,FadeIn,FadeOut} from "react-native-reanimated";
 import { Layout } from "../components/Layout";
 import { BaseColor as c } from "../components/Color";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Btn } from "../components/Button";
 import { useDispatch,useSelector } from "react-redux";
 import { loginUser,registerID } from "../redux/actions/authAction";
-import { getProfile } from "../redux/actions/authAction";
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
+import { getLocale,setLocale } from "../paraglide/runtime";
+import { m } from "../paraglide/messages";
+
 const Splash = ({ navigation }) => {
-    
-  
-    //AUTH TEST
+    //AUTH 
     const Dispath = useDispatch();
     const Auth = useSelector((state) => state.auth); 
     const CheckAuth =()=>{
         console.log("Loading Auth");
         if (!Auth.user || Auth.loading) return;
-
         if (!Auth.verified){
             navigation.replace("verifyotp")
         }else if (Auth.role==="user") {
@@ -37,15 +31,13 @@ const Splash = ({ navigation }) => {
         }
     }
 
-
     useEffect(() => {
     if (Auth.user) {
         console.log("USER:", Auth.user);
-        // Dispath(getProfile()); 
         CheckAuth(); 
     }
     }, [Auth.user]);
-    //AUTH TEST
+    //AUTH
 
     //AnimationSet
     const yOpen = useSharedValue(0);
@@ -64,7 +56,7 @@ const Splash = ({ navigation }) => {
         yOpen.value = withSequence(
             withDelay(500, withTiming(-400)),
             withTiming(0, {
-                duration: 1000,
+                duration: 500,
                 easing: Easing.bounce,
             })
         );
@@ -72,13 +64,13 @@ const Splash = ({ navigation }) => {
         xOpen.value = withSequence(
             withDelay(500, withTiming(-200)),
             withTiming(0, {
-                duration: 1200,
+                duration: 700,
                 easing: Easing.out(Easing.exp),
             })
         );
 
         scOpen.value = withSequence(
-            withDelay(1400, withTiming(1)),
+            withDelay(900, withTiming(1)),
             withTiming(20, {
                 duration: 1000,
                 easing: Easing.inOut(Easing.circle),
@@ -98,7 +90,7 @@ const Splash = ({ navigation }) => {
     const opacityOpen = useSharedValue(0);
     const WelcomeSlice = () => {
         opacityOpen.value = withSequence(
-            withDelay(1800, withTiming(0)),
+            withDelay(1300, withTiming(0)),
             withTiming(1, { duration: 1000 })
         );
     };
@@ -137,7 +129,7 @@ const Splash = ({ navigation }) => {
         transform: [
             {
                 translateY: withTiming((yLoginHead.value) * yLogin.value, {
-                    duration: 2000,
+                    duration: 1500,
                     easing: Easing.bezier(0.25, 0.1, 0.25, 1),
                 }),
             },
@@ -170,6 +162,7 @@ const Splash = ({ navigation }) => {
 
     const [isToggled, setIsToggled] = useState(false);
     const whitebar = useSharedValue(1200);
+
     const whiteslide = useAnimatedStyle(() => ({
         transform: [
             {
@@ -193,35 +186,38 @@ const Splash = ({ navigation }) => {
 
     useEffect(() => {
         yOpenmove.value = isToggled ? 600 : 0;
+        !isToggled&& (whitebar.value =900)
     }, [isToggled]);
 
     useEffect(() => {
         yLoginHead.value = login ? 0 : 2;
-        whitebar.value = isToggled ? 250 : 900;
-        yLogin.value = login ? 90 : 600;
         
-        login&&(setRegisterinput({
-            Email: "",
-            Username: "",
-            Password: "",
-            ConfirmPassword: "",
-        }),
-        setErrmsg(""),
-        setRolesetup("user"),
-        setChooseRole(false)
+        yLogin.value = login ? 90 : 600;
+        login&&(
+            whitebar.value = isToggled ? 250 : 900,
+            setRegisterinput({
+                Email: "",
+                Username: "",
+                Password: "",
+                ConfirmPassword: "",
+            }),
+            setErrmsg(""),
+            setRolesetup("user")
         )
     }, [login]);
 
     useEffect(() => {
-        yRegisterHead.value = register ? 0 : 2;
-        whitebar.value = isToggled ? 200 : 900;
         yRegister.value = register ? 90 : 700;
-
-        register&&(setLogininput({
+        yRegisterHead.value = register ? 0 : 2;
+        
+        register&&(
+            whitebar.value = isToggled ? 200 : 900,
+            setLogininput({
             Username: "",
             Password: "",
-        }),
-        setErrmsg("")
+            }),
+            setChooseRole(false),
+            setErrmsg("")
         )
     }, [register]);
 
@@ -249,7 +245,7 @@ const Splash = ({ navigation }) => {
             }
             if (register) {
                 yRegister.value = 90
-                whitebar.value = 230
+                whitebar.value = 200
             }
             if(login ===false && register === false){
                 whitebar.value = 900;
@@ -304,14 +300,14 @@ const Splash = ({ navigation }) => {
         }
 
         Dispath(registerID({
-            Email:registerinput.Email,
-            Username:registerinput.Username,
-            Password:registerinput.Password,
-        },{role:Rolesetup}))
+            email:registerinput.Email,
+            username:registerinput.Username,
+            password:registerinput.Password,
+            role:Rolesetup
+        }))
     }
     //validation
-
-
+    
     // Register State
     const [Rolesetup,setRolesetup] = useState("user");
     const [chooseRole,setChooseRole] = useState(false)
@@ -335,9 +331,14 @@ const Splash = ({ navigation }) => {
     }
     }, [Auth.loading, Auth.error, Auth.user, register]);
     
-    if(Auth.loading){
-        return <Loading/>
-    }
+    const [language, setLaguage] = useState(getLocale());
+    const toggleLanguage = () => {
+        const newLang = language === "th" ? "en" : "th";
+        console.log(language)
+        setLocale(newLang);
+        setLaguage(newLang);
+    };
+
     return (
         <SafeAreaView style={[Layout.centerset, { backgroundColor: c.white }]}>
             <TouchableWithoutFeedback onPress={() => {setlogin(false);setRegister(false);setIsToggled(false);}}>
@@ -391,7 +392,10 @@ const Splash = ({ navigation }) => {
                         },
                     ]}
                 />
-                <View style={[{ flex: 1, justifyContent: "center" }]}>
+                <TouchableOpacity onPress={toggleLanguage} style={[Btn.Btn2,{alignSelf:'flex-end'}]}>
+                    <Text>Language</Text>
+                </TouchableOpacity>
+                <View style={[{ flex: 1, justifyContent: "center" ,marginTop:-50}]}>
                     <Text
                         style={{
                             fontSize: 55,
@@ -426,7 +430,7 @@ const Splash = ({ navigation }) => {
                                     setRegister(false) 
                                 }}
                             >
-                                <Text style={Btn.textBtn2}>Login</Text>
+                                <Text style={Btn.textBtn2}>{m.login()}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -436,8 +440,21 @@ const Splash = ({ navigation }) => {
             <Animated.View style={[{ position: "absolute", top: 100 }, LoginTriggerHead]}>
                 <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>LOGIN</Text>
             </Animated.View>
-            <Animated.View style={[{ position: "absolute", top: 100 }, RegisterTriggerHead]}>
-                <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>REGISTER</Text>
+            <Animated.View style={[{ position: "absolute", top: 100, width:"100%", alignItems:'center'}, RegisterTriggerHead]}>
+                {!chooseRole?
+                <Animated.View
+                    key="chooseRole"
+                    exiting={FadeOut}
+                >
+                    <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>Choose Role</Text>
+                </Animated.View>
+                :
+                <Animated.View
+                    entering={FadeIn}
+                >
+                    <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>REGISTER</Text>
+                </Animated.View>
+                }
             </Animated.View>
 
             <Animated.View
@@ -454,66 +471,75 @@ const Splash = ({ navigation }) => {
                 ]}
             />
 
-            <Animated.View style={[{ position: "absolute", width: '80%' }, LoginTrigger]}>
-                <View
-                    style={[
-                        Layout.centerset,
-                        { gap: 20, justifyContent: "space-between" },
-                    ]}
-                >
+            <Animated.View style={[{ position: "absolute", width: '80%', gap: 20}, LoginTrigger]}>
+               
+                    <TextInputSplash name={"Username"} type={"text"} setvalue={(text) => setLogininput({ ...logininput, Username: text })} value={logininput.Username} />
+                    <TextInputSplash name={"Password"} type={"password"} setvalue={(text) => setLogininput({ ...logininput, Password: text })} value={logininput.Password} />
 
-                    <TextInputSplash name={"Username"} setvalue={(text) => setLogininput({ ...logininput, Username: text })} value={logininput.Username} />
-                    <TextInputSplash name={"Password"} setvalue={(text) => setLogininput({ ...logininput, Password: text })} value={logininput.Password} />
-
-                    <Text style={{ alignSelf: 'flex-end' }}>ForgotPassword</Text>
+                    <Text style={{ alignSelf: 'flex-end' ,color:c.blue}}>ForgotPassword</Text>
                     {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
                     <TouchableOpacity
-                        style={[Btn.Btn1, { width: '100%' }]}
+                        style={[Btn.Btn1, { width:'100%'}]}
                         onPress={SubmitLogin}
                     >
                         <Text style={{ textAlign: 'center' }}>SignIn</Text>
                     </TouchableOpacity>
-                    <Text>You dont have user</Text>
-                </View>
+                    <TouchableOpacity
+                        onPress={()=>{setlogin(false),setChooseRole(false),setRegister(true)}}
+                    >
+                        <Text style={{color:c.blue, textAlign: 'center' }}>You dont have user</Text>
+                    </TouchableOpacity>
 
             </Animated.View>
-            <Animated.View style={[{ position: "absolute", width: '80%' }, RegisterTrigger]}>
+            <Animated.View style={[{ position: "absolute", width: '80%' }, RegisterTrigger] }>
                     {!chooseRole?
-                        <View style={[Layout.columset]}>
-                            <TouchableOpacity
-                                style={[Btn.Btn1, { width: 200,height:200 }]}
-                                onPress={()=>{setRolesetup("user");setChooseRole(true)}}
-                            >
-                                <Text style={[{ textAlign: 'center',justifyContent:'center'},Btn.textBtn1]}>USER</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[Btn.Btn1, { width: 200,height:200 }]}
-                                onPress={()=>{setRolesetup("vendor");setChooseRole(true)}}
-                            >
-                                <Text style={[{ textAlign: 'center',justifyContent:'center'},Btn.textBtn1]}>VENDOR</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <Animated.View
+                            key="chooseRole"
+                            exiting={FadeOut}
+                        >
+                            <View style={[Layout.columset,{gap:30}]}>
+                                <TouchableOpacity
+                                    style={[Btn.Btn1,Layout.centerset ,{ width: 200,height:200 }]}
+                                    onPress={()=>{setRolesetup("user");setChooseRole(true)}}
+                                >  
+                                    <Text style={[{ textAlign: 'center' ,justifyContent:'center'},Btn.textBtn1]}>USER</Text>
+                                    <FontAwesome5 name="users" size={70} color={c.fullwhite}/>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[Btn.Btn1, Layout.centerset,{ width: 200,height:200 }]}
+                                    onPress={()=>{setRolesetup("vendor");setChooseRole(true)}}
+                                >
+                                    <Text style={[{ textAlign: 'center',justifyContent:'center'},Btn.textBtn1]}>VENDOR</Text>
+                                    <FontAwesome6 name="shop" size={70} color={c.fullwhite}/>
+                                </TouchableOpacity>
+                            </View>
+                        </Animated.View>
                     :
-                    <View
+                    <Animated.View
+                        entering={FadeIn}
                         style={[
-                            Layout.centerset,
-                            { gap: 13, justifyContent: "space-between" },
+                                Layout.centerset,
+                                { gap: 13, justifyContent: "space-between" },
+                                
                         ]}
                     >
-
-                    <TextInputSplash name={"Email"} setvalue={(text) => setRegisterinput({ ...registerinput, Email: text })} value={registerinput.Email} />
-                    <TextInputSplash name={"Username"} setvalue={(text) => setRegisterinput({ ...registerinput, Username: text })} value={registerinput.Username} />
-                    <TextInputSplash name={"Password"} setvalue={(text) => setRegisterinput({ ...registerinput, Password: text })} value={registerinput.Password} />
-                    <TextInputSplash name={"ConfrimPassword"} setvalue={(text) => setRegisterinput({ ...registerinput, ConfirmPassword: text })} value={registerinput.ConfirmPassword} />
-                    {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
-                    <TouchableOpacity
-                        style={[Btn.Btn1, { width: '100%' }]}
-                        onPress={SubmitRegister}
-                    >
-                        <Text style={{ textAlign: 'center' }}>SignIn</Text>
-                    </TouchableOpacity>
-                    <Text>You dont have user</Text>
-                    </View>
+                        <TextInputSplash name={"Email"} type={"email"} setvalue={(text) => setRegisterinput({ ...registerinput, Email: text })} value={registerinput.Email} />
+                        <TextInputSplash name={"Username"} type={"text"} setvalue={(text) => setRegisterinput({ ...registerinput, Username: text })} value={registerinput.Username} />
+                        <TextInputSplash name={"Password"} type={"password"} setvalue={(text) => setRegisterinput({ ...registerinput, Password: text })} value={registerinput.Password} />
+                        <TextInputSplash name={"ConfrimPassword"} type={"password"} setvalue={(text) => setRegisterinput({ ...registerinput, ConfirmPassword: text })} value={registerinput.ConfirmPassword} />
+                        {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
+                        <TouchableOpacity
+                            style={[Btn.Btn1, { width: '100%' }]}
+                            onPress={SubmitRegister}
+                        >
+                            <Text style={[{ textAlign: 'center'},Btn.textBtn1]}>Signup</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={()=>{setRegister(false),setlogin(true)}}
+                        >   
+                            <Text style={{fontWeight:"bold",color:c.blue}}>You have user</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
                     }
             </Animated.View>
             {Auth.loading&&(<Loading/>)}

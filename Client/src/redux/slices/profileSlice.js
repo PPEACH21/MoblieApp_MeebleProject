@@ -1,6 +1,5 @@
 // src/redux/slices/authSlice.js
 import { createSlice } from "@reduxjs/toolkit";
-import { getProfile } from "../actions/authAction";
 
 const initialState = {
   firstname:"",
@@ -15,11 +14,11 @@ const profileSlice = createSlice({
   name: "profile",
   initialState,
   reducers: {
-    loading : (state) => {
+    profileLoading : (state) => {
         state.loading = true;
     },
     getProfileSuccess:(state,action)=>{
-        state.loading=true;
+        state.loading=false;
         state.firstname=action.payload.firstname;
         state.lastname=action.payload.lastname;
         state.username=action.payload.username;
@@ -33,5 +32,5 @@ const profileSlice = createSlice({
   },
 });
 
-export const { profileLoading, getProfileSuccess, getProfileFailed ,loading} = profileSlice.actions;
+export const { profileLoading, getProfileSuccess, getProfileFailed} = profileSlice.actions;
 export default profileSlice.reducer;
