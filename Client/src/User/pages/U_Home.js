@@ -1,5 +1,5 @@
 // src/User/pages/U_Home.jsx
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View, Text, FlatList, Image, TouchableOpacity, RefreshControl,
   ActivityIndicator, StyleSheet, Platform, Modal, Pressable, TextInput
@@ -7,7 +7,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseColor as c } from "../../components/Color";
-import { api } from "../../axios";
+import { api} from "../../api/axios";
 
 const CHIP_H = 34;
 

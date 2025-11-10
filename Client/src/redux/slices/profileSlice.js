@@ -1,6 +1,5 @@
 // src/redux/slices/authSlice.js
 import { createSlice } from "@reduxjs/toolkit";
-import { getProfile } from "../actions/authAction";
 
 const initialState = {
   firstname:"",

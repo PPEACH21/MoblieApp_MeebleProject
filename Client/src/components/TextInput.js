@@ -1,10 +1,10 @@
 import { StyleSheet } from "react-native";
 import { Text,TextInput,View } from "react-native";
 import { BaseColor as c } from "./Color";
+import { useState } from "react";
 
 
 export const TEXTinput = StyleSheet.create({
-    
     Input1:{
         backgroundColor: c.white,
         color:c.black,
@@ -22,11 +22,11 @@ export const TEXTinput = StyleSheet.create({
 })
 
 
-export const TextInputSplash = ({name,setvalue,value})=>{
+export const TextInputSplash = ({name,setvalue,value,type})=>{ 
     return(
         <View style={{width:'100%',gap:5}}>
             <Text style={[TEXTinput.text01,{alignSelf:'flex-start'}]}>{name}</Text>
-            <TextInput style={[TEXTinput.Input1,{width:'100%'}]} placeholder={name} value={value||""} onChangeText={(text)=>setvalue(text)}/>
+            <TextInput style={[TEXTinput.Input1,{width:'100%'}]} placeholder={name} value={value||""} secureTextEntry={type==="password"?true:false} type={type} onChangeText={(text)=>setvalue(text)}/>
         </View>
     )
 }
