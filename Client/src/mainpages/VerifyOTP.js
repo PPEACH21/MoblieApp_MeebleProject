@@ -7,47 +7,58 @@ import { Btn } from "../components/Button";
 import { BaseColor as c } from "../components/Color";
 import { api } from "../api/axios";
 import Loading from "./Loading";
-const VerifyOTP = ({ navigation }) => {
+import { TextInputSplash } from "../components/TextInput";
+
+const VerifyOTP = ({ navigation}) => {
  const dispatch = useDispatch();
   const Profile = useSelector((state) => state.profile);
   const Auth = useSelector((state) => state.auth);
+  
+  const [email,setEmail] = useState("");
+  const [state,setState] = useState(1);
+  useEffect(() => {
+    sendmessage();
+  },[]);
+  
+  const [otpCooldown, setOtpCooldown] = useState(0); 
+  const [errmsg, setErrmsg] = useState(""); 
 
   useEffect(() => {
-    sendmessage()
-  },[]);
-
-  const SendOTPRepassword = async() => {
-    try {
-      const res = await api.post("/sendotp_repassword",{ email:Profile.email });
-      console.log("OTP sent successfully:", res.data);
-    } catch (err) {
-      console.error("Error sending OTP:", err);
+    let timer;
+    if (otpCooldown > 0) {
+      timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
     }
-  };
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
 
-  const SendOTP = async () => {
+   const SendOTP = async (profileData) => {
     try {
       const res = await api.post(
         "/sendotp",
         {
-          username: Profile.username,
-          email: Profile.email,
+          username: profileData.username,
+          email: profileData.email,
         },{headers: { Authorization: `Bearer ${Auth.token}` },});
 
       console.log("OTP sent successfully:", res.data);
+      setOtpCooldown(15);
     } catch (err) {
       console.error("Error sending OTP:", err);
     }
   };
 
   const sendmessage =async() => {
-    if(Auth){
-      console.log("CHECK")
-      await dispatch(getProfile());
-      console.log(Profile)
-      SendOTP()
+    if (otpCooldown > 0) return;
+    if(Auth.user){
+      const profileData = await dispatch(getProfile());
+      console.log(profileData)
+      await SendOTP(profileData);
     }else{
-      SendOTPRepassword()
+      if (!email) {
+        setState(0);
+        return;
+      }
+      await SendOTPRepassword();
     }
   };
 
@@ -72,14 +83,25 @@ const VerifyOTP = ({ navigation }) => {
     }
   };
 
+
+  const SendOTPRepassword = async() => {
+    try {
+      console.log(email)
+      const res = await api.post("/sendotp_repassword",{ email:email });
+      console.log("OTP sent successfully:", res.data);
+      setOtpCooldown(15);
+    } catch (err) {
+      console.error("Error sending OTP:", err);
+    }
+  };
   
   const handleVerify =async() => {
     const code = otp.join("");
     console.log("🔢 OTP:", code);
     if (code.length === 6) {
       try{
-        if (Auth) {
-        const res = api.post("/checkotp",{ otp: code, email: Profile?.email });
+        if (Auth.user) {
+        const res = api.post("/checkotp",{ otp: code, email: Profile?.email});
         console.log("checkOTP Success", res?.status);
         
         const updatadata = await api.put(
@@ -93,9 +115,9 @@ const VerifyOTP = ({ navigation }) => {
           navigation.navigate("HomeUser")
         }
       }else{
-        const res = await api.post(`/checkotp`, { otp: code, email:Profile.email });
+        const res = await api.post(`/checkotp`, { otp: code, email:email });
         console.log("checkOTP Success", res?.status);
-        console.log("Changepassword Page");
+        setState(2);
       }
       }catch(err){
         errmsg("OTP not correct")
@@ -109,38 +131,72 @@ const VerifyOTP = ({ navigation }) => {
 
    return (
     <View style={[Layout.container ,Layout.centerset,{gap:40}]}>
+      
       <View>
-        <Text style={{fontSize:20,fontWeight:'bold',textAlign:'center'}} >กรอกรหัส OTP</Text>
-        <Text style={{fontSize:20}} >Plese Enter your OTP</Text>
+        {state===0&&(
+          <View>
+            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >กรอกEmail</Text>
+            <Text style={{fontSize:20}} >Plese Enter your Email</Text>
+          </View>
+        )}
+        {state===1&&(
+          <View>
+            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >กรอกรหัส OTP</Text>
+            <Text style={{fontSize:20}} >Plese Enter your OTP</Text>
+          </View>
+        )}
+        {state===2&&(
+          <View>
+            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >กรอกรหัสใหม่</Text>
+            <Text style={{fontSize:20}} >Plese Enter your NewPassword</Text>
+          </View>
+        )}
       </View>
 
-      <View style={[Layout.rowset,{width:'100%',justifyContent:'center'}]} >
-        {otp.map((digit, index) => (
-          <TextInput
-            key={index}
-            ref={(ref) => (inputRefs.current[index] = ref)}
-            value={digit}
-            onChangeText={(text) => handleChange(text, index)}
-            onKeyPress={(e) => handleKeyPress(e, index)}
-            keyboardType="number-pad"
-            maxLength={1}
-            style={[Btn.Btn2,{paddingVertical:20,color:c.S1,fontSize:20, paddingHorizontal:0, width:45,height:75, textAlign:'center',fontWeight:'bold'}]}
-          />
-        ))}
-      </View>
-
-      <TouchableOpacity
-        style={[Btn.Btn1,{paddingHorizontal:40}]} 
-        onPress={sendmessage}
-      >
-        <Text style={[Btn.textBtn1]}>ส่งOTPใหม่</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[Btn.Btn1,{paddingHorizontal:40}]} 
-        onPress={handleVerify}
-      >
-        <Text style={[Btn.textBtn1]}>ยืนยันรหัส</Text>
-      </TouchableOpacity>
+      {state===0&&(
+        <View style={{width:'80%', gap:20}}>
+          <TextInputSplash name="Email" value={email} setvalue={setEmail} type={"email"}/>
+          <TouchableOpacity
+            style={[Btn.Btn1,{paddingHorizontal:40}]} 
+            onPress={()=>{setState(1),sendmessage()}}
+          >
+            <Text style={[Btn.textBtn1]}>ยืนยันEmail</Text>
+          </TouchableOpacity>
+        </View>
+      )} 
+      
+      {state===1&&(
+        <View>
+          <View style={[Layout.rowset,{width:'100%',justifyContent:'center'}]} >
+            {otp.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={(ref) => (inputRefs.current[index] = ref)}
+                value={digit}
+                onChangeText={(text) => handleChange(text, index)}
+                onKeyPress={(e) => handleKeyPress(e, index)}
+                keyboardType="number-pad"
+                maxLength={1}
+                style={[Btn.Btn2,{paddingVertical:20,color:c.S1,fontSize:20, paddingHorizontal:0, width:45,height:75, textAlign:'center',fontWeight:'bold'}]}
+              />
+            ))}
+          </View>
+          <TouchableOpacity
+            style={[{paddingHorizontal:40, alignSelf:'flex-end'}]} 
+            onPress={sendmessage}
+            disabled={otpCooldown > 0}
+          >
+            <Text style={{textAlign:'right'}}>{otpCooldown > 0 ? `ส่งใหม่อีก ${otpCooldown} วินาที` : "ส่ง OTP ใหม่"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[Btn.Btn1,{paddingHorizontal:40}]} 
+            onPress={handleVerify}
+          >
+            {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
+            <Text style={[Btn.textBtn1]}>ยืนยันรหัส</Text>
+          </TouchableOpacity>
+        </View>
+      )} 
       {Profile.loading&&(<Loading/>)}
     </View>
   );
