@@ -120,13 +120,13 @@ func CheckEmail(c *fiber.Ctx)error{
 func OTPrepassword()fiber.Handler{
 	return func(c *fiber.Ctx)error{
 	var body models.OTP_Verify
-	
+		
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
-	fmt.Print("CHECK")
+	fmt.Print(body.Email)
 	if body.Email == "" {
 		return c.Status(fiber.StatusBadRequest).SendString("Email is required");
 	}
@@ -170,6 +170,19 @@ func OTPrepassword()fiber.Handler{
 		<p>ขอบคุณที่ใช้บริการ Meeble 🙏</p>
 	</div>`,body.Email,otp))
 	m.Send(message)
+
+	_,err = config.OTP.Doc(body.Email).Set(config.Ctx,map[string]interface{}{
+		"email":     body.Email,
+		"otp":       otp,
+		"createdAt": time.Now(),
+		"expireAt":  expireAt,
+	})
+		if err != nil {
+			log.Println("Error saving OTP:", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to save OTP",
+		})
+	}
 
 	return c.JSON(fiber.Map{
 		"status":  "success",

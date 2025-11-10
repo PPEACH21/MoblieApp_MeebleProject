@@ -16,19 +16,18 @@ export const getProfile=()=>async(dispatch)=>{
             }
         })
         
-        await dispatch(getProfileSuccess({
-            firstname:res.data.firstname||"",
-            lastname:res.data.lastname||"",
-            username:res.data.username||"" ,
-            email:res.data.email||"",
-            avatar:res.data.avatar||"",
-        }));
-        console.log(res.data)
-        console.log("GetProfile Success")
-        return res.data;
-        
+        const profileData = {
+            firstname: res.data.firstname || "",
+            lastname: res.data.lastname || "",
+            username: res.data.username || "",
+            email: res.data.email || "",
+            avatar: res.data.avatar || "",
+        };
+        dispatch(getProfileSuccess(profileData));
+        return profileData;
     } catch (error) {
         console.log("Error fetching profile:", error);
         dispatch(getProfileFailed(error));
+        return error
     }
 }

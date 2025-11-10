@@ -22,7 +22,7 @@ const Splash = ({ navigation }) => {
     const CheckAuth =()=>{
         console.log("Loading Auth");
         if (!Auth.user || Auth.loading) return;
-        if (!Auth.verified){
+        if (Auth.user && !Auth.verified){
             navigation.replace("verifyotp")
         }else if (Auth.role==="user") {
             navigation.replace("HomeUser")
@@ -476,7 +476,11 @@ const Splash = ({ navigation }) => {
                     <TextInputSplash name={"Username"} type={"text"} setvalue={(text) => setLogininput({ ...logininput, Username: text })} value={logininput.Username} />
                     <TextInputSplash name={"Password"} type={"password"} setvalue={(text) => setLogininput({ ...logininput, Password: text })} value={logininput.Password} />
 
-                    <Text style={{ alignSelf: 'flex-end' ,color:c.blue}}>ForgotPassword</Text>
+                    <TouchableOpacity
+                        onPress={()=>{navigation.navigate("verifyotp")}}
+                    >
+                        <Text style={{ alignSelf: 'flex-end' ,color:c.blue}}>ForgotPassword</Text>
+                    </TouchableOpacity>
                     {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
                     <TouchableOpacity
                         style={[Btn.Btn1, { width:'100%'}]}

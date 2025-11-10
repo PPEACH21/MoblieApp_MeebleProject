@@ -43,6 +43,7 @@ func main(){
 
 	app.Post("/login",service.Login)
 	app.Post("/register",service.CreateUser)
+	app.Post("/sendotp_repassword", service.OTPrepassword())
 	app.Post("/checkotp", service.MathOTP)
 	app.Use(middlewares.ProtectedAuth())
 		routes.Routes(app)
