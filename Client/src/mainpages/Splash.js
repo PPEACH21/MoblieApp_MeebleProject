@@ -12,7 +12,6 @@ import { useDispatch,useSelector } from "react-redux";
 import { loginUser,registerID } from "../redux/actions/authAction";
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { getProfile } from "../redux/actions/profileAction";
 import { getLocale,setLocale } from "../paraglide/runtime";
 import { m } from "../paraglide/messages";
 
@@ -23,7 +22,6 @@ const Splash = ({ navigation }) => {
     const CheckAuth =()=>{
         console.log("Loading Auth");
         if (!Auth.user || Auth.loading) return;
-
         if (!Auth.verified){
             navigation.replace("verifyotp")
         }else if (Auth.role==="user") {
@@ -36,7 +34,6 @@ const Splash = ({ navigation }) => {
     useEffect(() => {
     if (Auth.user) {
         console.log("USER:", Auth.user);
-        Dispath(getProfile()); 
         CheckAuth(); 
     }
     }, [Auth.user]);
@@ -334,10 +331,6 @@ const Splash = ({ navigation }) => {
     }
     }, [Auth.loading, Auth.error, Auth.user, register]);
     
-    if(Auth.loading){
-        return <Loading/>
-    }
-    
     const [language, setLaguage] = useState(getLocale());
     const toggleLanguage = () => {
         const newLang = language === "th" ? "en" : "th";
@@ -437,8 +430,7 @@ const Splash = ({ navigation }) => {
                                     setRegister(false) 
                                 }}
                             >
-                                <Text style={Btn.textBtn2}>{m.IFIN()}</Text>
-                                <Text style={Btn.textBtn2}>{m.DSS()}</Text>
+                                <Text style={Btn.textBtn2}>{m.login()}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
