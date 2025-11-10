@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"cloud.google.com/go/firestore"
+	"google.golang.org/genproto/googleapis/type/latlng"
+)
 
 var AllowedTypes = map[string]bool{
 	"MainCourse": true,
@@ -25,12 +30,14 @@ type Shop struct {
 	Image       string `json:"image,omitempty" firestore:"image,omitempty"`
 
 	// ✅ pointer รองรับ null
-	PriceMin      *float64 `json:"price_min,omitempty" firestore:"price_min,omitempty"`
-	PriceMax      *float64 `json:"price_max,omitempty" firestore:"price_max,omitempty"`
-	MenuActiveCnt *int     `json:"menu_active_count,omitempty" firestore:"menu_active_count,omitempty"`
+	PriceMin      *float64               `json:"price_min,omitempty" firestore:"price_min,omitempty"`
+	PriceMax      *float64               `json:"price_max,omitempty" firestore:"price_max,omitempty"`
+	MenuActiveCnt *int                   `json:"menu_active_count,omitempty" firestore:"menu_active_count,omitempty"`
+	Address       *latlng.LatLng         `json:"address,omitempty" firestore:"address,omitempty"`
+	VendorRef     *firestore.DocumentRef `json:"-" firestore:"vendor_id,omitempty"`
 
-	Address       *GeoPoint `json:"address,omitempty" firestore:"address,omitempty"`
-	VendorID      string    `json:"vendor_id,omitempty" firestore:"vendor_id,omitempty"`
+	// ✅ NEW: This field will be sent as a string in the JSON response
+	VendorID      string    `json:"vendor_id,omitempty" firestore:"-"`
 	OrderActive   bool      `json:"order_active" firestore:"order_active"`
 	ReserveActive bool      `json:"reserve_active" firestore:"reserve_active"`
 	Status        string    `json:"status" firestore:"status"` // "open" | "closed"

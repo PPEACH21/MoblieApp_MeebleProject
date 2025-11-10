@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/gofiber/fiber/v2"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -18,8 +19,8 @@ import (
 
 const (
 	OrderPrepare   = "prepare"
-	OrderReady     = "ready"
-	OrderCompleted = "completed"
+	OrderReady     = "ongoing"
+	OrderCompleted = "done"
 )
 
 var AllowedOrderStatus = map[string]bool{
@@ -121,7 +122,7 @@ func GetOrderByID(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"order": ord})
 }
 
-// GET /shops/:shopId/orders?status=prepare (ดึงออเดอร์ตามร้าน + กรองสถานะได้)
+// GET /shops/:shopId/orders?status=prepare
 func ListOrdersByShop(c *fiber.Ctx) error {
 	shopId := c.Params("shopId")
 	if shopId == "" {
@@ -129,25 +130,31 @@ func ListOrdersByShop(c *fiber.Ctx) error {
 	}
 	status := c.Query("status", "")
 
-	q := config.Client.Collection(ColOrders).Where("shop_id", "==", shopId).OrderBy("CreatedAt", firestore.Desc)
+	q := config.Client.Collection("orders").
+		Where("shopId", "==", shopId)
+
 	if status != "" {
 		q = q.Where("status", "==", status)
 	}
 
-	docs, err := q.Documents(config.Ctx).GetAll()
+	snaps, err := q.Documents(config.Ctx).GetAll()
 	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list orders", "msg": err.Error()})
+		fmt.Printf("🔥 [ListOrdersByShop] shopId=%s status=%s err=%v\n", shopId, status, err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list orders",
+			"msg":   err.Error(),
+		})
 	}
 
-	orders := make([]models.Order, 0, len(docs))
-	for _, d := range docs {
+	out := make([]models.Order, 0, len(snaps))
+	for _, d := range snaps {
 		var ord models.Order
 		if err := d.DataTo(&ord); err == nil {
 			ord.ID = d.Ref.ID
-			orders = append(orders, ord)
+			out = append(out, ord)
 		}
 	}
-	return c.JSON(fiber.Map{"orders": orders})
+	return c.JSON(fiber.Map{"orders": out})
 }
 
 // PUT /orders/:orderId/status   { "status": "prepare" }
@@ -200,6 +207,69 @@ func UpdateOrderStatus(c *fiber.Ctx) error {
 		ord.ID = doc.Ref.ID
 	}
 	return c.JSON(fiber.Map{"order": ord})
+}
+func ListHistoryByShop(c *fiber.Ctx) error {
+	shopId := c.Params("shopId")
+	if shopId == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "shopId required"})
+	}
+
+	limit := c.QueryInt("limit", 50)
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+
+	var cursor time.Time
+	if s := c.Query("startAfter", ""); s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			cursor = t
+		}
+	}
+
+	col := config.Client.Collection("shops").Doc(shopId).Collection("history")
+
+	q := col.OrderBy("movedToHistoryAt", firestore.Desc).Limit(limit)
+	if !cursor.IsZero() {
+		q = q.StartAfter(cursor)
+	}
+
+	iter := q.Documents(config.Ctx)
+	defer iter.Stop()
+
+	var out []models.Order
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		var o models.Order
+		if err := doc.DataTo(&o); err != nil {
+			continue
+		}
+		o.ID = doc.Ref.ID
+
+		out = append(out, o)
+	}
+
+	resp := fiber.Map{
+		"shopId":  shopId,
+		"history": out,
+	}
+	if len(out) > 0 {
+		last := out[len(out)-1]
+		// ใช้ createdAt หรือ movedToHistoryAt แล้วแต่ field ที่มี
+		ts := last.UpdatedAt
+		if ts.IsZero() {
+			ts = last.CreatedAt
+		}
+		resp["nextStartAfter"] = ts.Format(time.RFC3339)
+	}
+
+	return c.JSON(resp)
 }
 
 // utils: ดึง key names ของ map[string]bool
