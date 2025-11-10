@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BaseColor as c } from "../../components/Color";
-import { api } from "../../axios";
+import { api } from "../../api/axios";
 import { useDispatch, useSelector } from "react-redux";
 
 /* ---------- helpers ---------- */

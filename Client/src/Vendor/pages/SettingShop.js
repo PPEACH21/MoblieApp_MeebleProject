@@ -15,7 +15,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
-import { api } from "../../axios";
+import { api } from "../../api/axios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";

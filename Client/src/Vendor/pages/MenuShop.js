@@ -21,7 +21,7 @@ import { useFocusEffect, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
-import { api } from "../../axios";
+import { api } from "../../api/axios";
 import { useDispatch, useSelector } from "react-redux";
 import { BaseColor as c } from "../../components/Color";
 import { useEffect } from "react";
