@@ -1,5 +1,5 @@
 // src/Vendor/OrderShop.jsx
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { api } from "../../api/axios";
 import { BaseColor as c } from "../../components/Color";
 import { useSelector, useDispatch } from "react-redux";
+import {Btn} from "../../components/Button"
 
 /* ---------- config ---------- */
 const STATUSES = ["prepare", "ready", "completed"];
@@ -294,7 +295,7 @@ export default function OrderShop() {
         onPress={onPress}
         disabled={busy}
         style={{
-          paddingHorizontal: 12,
+          paddingHorizontal: 40,
           paddingVertical: 9,
           borderRadius: 10,
           marginLeft: 8,
@@ -310,15 +311,15 @@ export default function OrderShop() {
 
     if (s === "prepare") {
       return (
-        <View style={{ flexDirection: "row" }}>
+        <View style={{ flexDirection: "row" ,alignSelf:'center' }}>
           <Btn label="พร้อมส่ง/รับ" onPress={() => updateStatus(o.id, "ready")} />
         </View>
       );
     }
     if (s === "ready") {
       return (
-        <View style={{ flexDirection: "row" }}>
-          <Btn label="เสร็จสิ้น" onPress={() => updateStatus(o.id, "completed")} />
+        <View style={{ flexDirection: "row" ,alignSelf:'center' }}>
+          <Btn label="เสร็จสิ้น"  onPress={() => updateStatus(o.id, "completed")} />
         </View>
       );
     }
@@ -332,9 +333,9 @@ export default function OrderShop() {
         style={{
           backgroundColor: c.fullwhite,
           padding: 14,
-          borderRadius: 14,
-          marginBottom: 10,
-          borderWidth: 1,
+          borderRadius: 20,
+          marginBottom: 5,
+          borderWidth: 2,
           borderColor: c.S3,
         }}
       >
@@ -406,7 +407,7 @@ export default function OrderShop() {
     <View
       style={{
         flexDirection: "row",
-        flexWrap: "wrap",
+        justifyContent:'space-evenly',
         paddingHorizontal: 16,
         paddingTop: 10,
         paddingBottom: 6,
@@ -422,8 +423,8 @@ export default function OrderShop() {
             style={{
               paddingHorizontal: 12,
               paddingVertical: 8,
-              borderRadius: 999,
-              backgroundColor: active ? c.S2 : c.S3,
+              borderRadius: 10,
+              backgroundColor: active ? c.S1 : c.S4,
               borderWidth: active ? 0 : 1,
               borderColor: c.S3,
             }}
@@ -454,7 +455,7 @@ export default function OrderShop() {
       <StatusBar style="dark" />
 
       {/* Header + toggle view */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 25, paddingBottom: 6 }}>
         <Text style={{ fontSize: 20, fontWeight: "900", color: c.black }}>
           {view === "orders" ? "ออเดอร์ร้าน" : "ประวัติออเดอร์"}
         </Text>
@@ -464,16 +465,16 @@ export default function OrderShop() {
             : `รวม ${history.length} รายการ`}
         </Text>
 
-        <View style={{ flexDirection: "row", marginTop: 8 }}>
+        <View style={{ flexDirection: "row", marginTop: 10  ,justifyContent:'space-evenly'}}>
           <Pressable
             onPress={() => { setView("orders"); fetchOrders(); }}
-            style={{
-              paddingHorizontal: 10,
+            style={[Btn.Btn2,{
+              paddingHorizontal: 50,
               paddingVertical: 6,
               borderRadius: 8,
-              backgroundColor: view === "orders" ? c.S2 : c.S3,
+              backgroundColor: view === "orders" ? c.S1 : c.fullwhite,
               marginRight: 8,
-            }}
+            }]}
           >
             <Text style={{ color: view === "orders" ? c.fullwhite : c.black, fontWeight: "800" }}>
               ออเดอร์
@@ -481,12 +482,13 @@ export default function OrderShop() {
           </Pressable>
           <Pressable
             onPress={() => { setView("history"); fetchHistory(); }}
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 8,
-              backgroundColor: view === "history" ? c.S2 : c.S3,
-            }}
+            style={[Btn.Btn2,{
+                paddingHorizontal: 50,
+                paddingVertical: 6,
+                borderRadius: 8,
+                backgroundColor: view === "history" ? c.S1 : c.fullwhite,
+                marginRight: 8,
+            }]}
           >
             <Text style={{ color: view === "history" ? c.fullwhite : c.black, fontWeight: "800" }}>
               ประวัติ
@@ -502,7 +504,7 @@ export default function OrderShop() {
       {view === "orders" ? (
         loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator size="large" color={c.S2} />
+            <ActivityIndicator size="large" color={c.S1} />
             <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
               กำลังโหลดออเดอร์…
             </Text>
@@ -523,7 +525,7 @@ export default function OrderShop() {
             data={orders}
             keyExtractor={(o, i) => String(o.id || i)}
             renderItem={renderItem}
-            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 20 }}
+            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 100 }}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />
             }
@@ -559,7 +561,7 @@ export default function OrderShop() {
             data={history}
             keyExtractor={(o, i) => String(o.id || i)}
             renderItem={renderItem}
-            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 20 }}
+            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 100 }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
