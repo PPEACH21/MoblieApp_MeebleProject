@@ -22,8 +22,7 @@ import {
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { BaseColor as c } from "../../components/Color";
-import { api} from "../../api/axios";
-
+import { api } from "../../api/axios";
 
 /* ---------- helpers ---------- */
 const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
@@ -42,20 +41,25 @@ const formatPriceRange = (min, max) => {
   return a === b ? fmtTHB(a) : `${fmtTHB(a)} – ${fmtTHB(b)}`;
 };
 
-const normalizeShop = (raw) => ({
-  id: raw.id || raw.shop_id || raw.shopId || raw.docId,
-  shop_name: raw.shop_name || raw.name || "ร้านไม่ระบุชื่อ",
-  description: raw.description || "",
-  type: raw.type || "-",
-  status: raw.status || "active",
-  image: raw.image || raw.cover || raw.thumbnail || null,
-  price_min: raw.price_min ?? raw.min_price ?? null,
-  price_max: raw.price_max ?? raw.max_price ?? null,
-  rate: toNum(raw.rate ?? raw.rating ?? 0),
-  order_active: !!(raw.order_active ?? raw.orderActive ?? true),
-  reserve_active: !!(raw.reserve_active ?? raw.reserveActive ?? false),
-  address: raw.address || raw.location || null,
-});
+const normalizeShop = (raw) => {
+    const s = (raw?.status ?? "").toString().toLowerCase();
+    const isOpen = s === "open" || s === "active" || s === "true" || s === "1";
+
+    return {
+      id: raw.id || raw.shop_id || raw.shopId || raw.docId,
+      shop_name: raw.shop_name || raw.name || "ร้านไม่ระบุชื่อ",
+      description: raw.description || "",
+      type: raw.type || "-",
+      status: isOpen,
+      image: raw.image || raw.cover || raw.thumbnail || null,
+      price_min: raw.price_min ?? raw.min_price ?? null,
+      price_max: raw.price_max ?? raw.max_price ?? null,
+      rate: toNum(raw.rate ?? raw.rating ?? 0),
+      order_active: !!(raw.order_active ?? raw.orderActive ?? true),
+      reserve_active: !!(raw.reserve_active ?? raw.reserveActive ?? false),
+      address: raw.address || raw.location || null,
+    };
+  };
 
 const normalizeMenuItem = (raw) => ({
   id: raw.id || raw.menu_id || raw.menuId || raw.docId,
@@ -172,29 +176,31 @@ export default function UserShopDetail() {
       )}`
     );
   };
-
+  
   const statusBadge = useMemo(() => {
-    const s = (shop?.status || "").toLowerCase();
     let bg = "#e5e7eb";
     let tx = c.black;
-    if (s === "open" || s === "active") {
+    let label = "ไม่ระบุ";
+
+    if (shop?.status === true) {
       bg = "#dcfce7";
       tx = "#166534";
-    } else if (s === "closed") {
+      label = "เปิดอยู่";
+    } else if (shop?.status === false) {
       bg = "#fee2e2";
       tx = "#991b1b";
-    } else if (s === "pending") {
-      bg = "#fef9c3";
-      tx = "#854d0e";
+      label = "ปิดอยู่";
     }
-    return { bg, tx, label: shop?.status || "-" };
-  }, [shop]);
+    return { bg, tx, label };
+  }, [shop?.status]);
 
   if (loading)
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={c.S2} />
-        <Text style={{ color: c.S5, marginTop: 8 }}>กำลังโหลดข้อมูลร้าน...</Text>
+        <Text style={{ color: c.S5, marginTop: 8 }}>
+          กำลังโหลดข้อมูลร้าน...
+        </Text>
       </View>
     );
 
@@ -300,9 +306,7 @@ export default function UserShopDetail() {
 
             <TextInput
               value={qty}
-              onChangeText={(t) =>
-                setQty(t.replace(/[^0-9]/g, "") || "1")
-              }
+              onChangeText={(t) => setQty(t.replace(/[^0-9]/g, "") || "1")}
               keyboardType="number-pad"
               style={styles.qtyInput}
             />

@@ -5,11 +5,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/gofiber/fiber/v2"
+	"google.golang.org/genproto/googleapis/type/latlng"
 
 	"github.com/PPEACH21/MoblieApp_MeebleProject/config"
 	"github.com/PPEACH21/MoblieApp_MeebleProject/models"
@@ -58,8 +60,8 @@ func CreateShop(c *fiber.Ctx) error {
 	if in.PriceMin != nil && in.PriceMax != nil && *in.PriceMin > *in.PriceMax {
 		return badRequest(c, "price_min must be <= price_max")
 	}
-	if in.Status == "" {
-		in.Status = "open"
+	if in.Status == false {
+		in.Status = false
 	}
 
 	now := time.Now()
@@ -79,18 +81,135 @@ func CreateShop(c *fiber.Ctx) error {
 
 // GET /shops
 func GetAllShops(c *fiber.Ctx) error {
-	ds, err := config.Client.Collection("shops").Documents(config.Ctx).GetAll()
+	ctx := config.Ctx
+
+	docs, err := config.Client.Collection("shops").Documents(ctx).GetAll()
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	out := make([]models.Shop, 0, len(ds))
-	for _, d := range ds {
+	out := make([]models.Shop, 0, len(docs))
+
+	for _, d := range docs {
+		data := d.Data()
+
 		var s models.Shop
-		if err := d.DataTo(&s); err != nil {
-			continue
-		}
 		s.ID = d.Ref.ID
+
+		// --- Strings ---
+		if v, ok := data["shop_name"].(string); ok {
+			s.ShopName = v
+		}
+		if v, ok := data["description"].(string); ok {
+			s.Description = v
+		}
+		if v, ok := data["type"].(string); ok {
+			s.Type = v
+		}
+		if v, ok := data["image"].(string); ok {
+			s.Image = v
+		}
+		if v, ok := data["status"].(bool); ok {
+			s.Status = v
+		}
+
+		// --- Numbers (float64) ---
+		if v, ok := data["price_min"]; ok {
+			switch n := v.(type) {
+			case float64:
+				s.PriceMin = &n
+			case int64:
+				f := float64(n)
+				s.PriceMin = &f
+			case int:
+				f := float64(n)
+				s.PriceMin = &f
+			case string:
+				if f, err := strconv.ParseFloat(n, 64); err == nil {
+					s.PriceMin = &f
+				}
+			}
+		}
+		if v, ok := data["price_max"]; ok {
+			switch n := v.(type) {
+			case float64:
+				s.PriceMax = &n
+			case int64:
+				f := float64(n)
+				s.PriceMax = &f
+			case int:
+				f := float64(n)
+				s.PriceMax = &f
+			case string:
+				if f, err := strconv.ParseFloat(n, 64); err == nil {
+					s.PriceMax = &f
+				}
+			}
+		}
+
+		// --- Booleans ---
+		if v, ok := data["order_active"]; ok {
+			switch b := v.(type) {
+			case bool:
+				s.OrderActive = b
+			case string:
+				s.OrderActive = b == "true" || b == "1"
+			case float64:
+				s.OrderActive = b == 1
+			case int:
+				s.OrderActive = b == 1
+			}
+		}
+		if v, ok := data["reserve_active"]; ok {
+			switch b := v.(type) {
+			case bool:
+				s.ReserveActive = b
+			case string:
+				s.ReserveActive = b == "true" || b == "1"
+			case float64:
+				s.ReserveActive = b == 1
+			case int:
+				s.ReserveActive = b == 1
+			}
+		}
+
+		// --- Address (ละติจูด/ลองจิจูด) ---
+		if v, ok := data["address"].(map[string]interface{}); ok {
+			if lat, ok1 := v["Latitude"].(float64); ok1 {
+				if lng, ok2 := v["Longitude"].(float64); ok2 {
+					s.Address = &latlng.LatLng{Latitude: lat, Longitude: lng}
+				}
+			}
+		}
+
+		// --- VendorRef ---
+		if v, ok := data["vendor_id"].(*firestore.DocumentRef); ok {
+			s.VendorRef = v
+			s.VendorID = v.ID
+		}
+
+		// --- Timestamps ---
+		if v, ok := data["createdAt"].(time.Time); ok {
+			s.CreatedAt = v
+		} else if v, ok := data["createdAt"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, v); err == nil {
+				s.CreatedAt = t
+			}
+		}
+		if v, ok := data["updatedAt"].(time.Time); ok {
+			s.UpdatedAt = v
+		} else if v, ok := data["updatedAt"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, v); err == nil {
+				s.UpdatedAt = t
+			}
+		}
+		if s.CreatedAt.IsZero() {
+			s.CreatedAt = time.Now()
+		}
+		if s.UpdatedAt.IsZero() {
+			s.UpdatedAt = s.CreatedAt
+		}
+
 		out = append(out, s)
 	}
 

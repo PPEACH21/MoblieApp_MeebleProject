@@ -21,7 +21,6 @@ const FILTERS = [
   { key: "all", label: "ทั้งหมด" },
   { key: "prepare", label: "กำลังทำ" },
   { key: "ready", label: "พร้อมส่ง/รับ" },
-  { key: "completed", label: "เสร็จสิ้น" },
 ];
 
 const mapStatus = (s) => {

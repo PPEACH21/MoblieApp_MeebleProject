@@ -116,9 +116,6 @@ export default function HomeShop() {
   const Auth = useSelector((state) => state.auth);
   const [shop, setShop] = useState(null);
   const [shopId, setShopId] = useState(null);
-  const headers = Auth.token
-    ? { Authorization: `Bearer ${Auth.token}` }
-    : undefined;
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   // console.log(Auth)
@@ -141,7 +138,7 @@ export default function HomeShop() {
 
   const tryGet = async (url) => {
     try {
-      const { data } = await api.get(url, { headers });
+      const { data } = await api.get(url);
       return data;
     } catch {
       return null;
@@ -150,7 +147,7 @@ export default function HomeShop() {
   const getShopId = useCallback(async () => {
     if (!Auth?.user || !Auth?.token) return; // รอ auth พร้อมก่อน
     try {
-      const { data } = await api.get(`/shop/by-id/${Auth.user}`, { headers });
+      const { data } = await api.get(`/shop/by-id/${Auth.user}`);
       setShopId(data?.id ?? null);
     } catch (e) {
       console.log("Could not find shop for user", e?.message);
@@ -167,7 +164,7 @@ export default function HomeShop() {
     setLoading(true);
     setErr(null);
     try {
-      const { data } = await api.get(`/shop/${shopId}`, { headers });
+      const { data } = await api.get(`/shop/${shopId}`);
       const shopData = data?.shop || data || null;
       if (!shopData) throw new Error("ยังไม่มีร้าน โปรดสร้างร้านก่อน");
       setShop(normalizeShop(shopData));

@@ -1,6 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Splash from './mainpages/Splash';
-import U_ButtonNav from './User/U_ButtonNav'
+import UserStack from './User/UserStack'
 import V_ButtonNav from './Vendor/V_ButtonNav';
 import VerifyOTP from './mainpages/VerifyOTP';
 
@@ -13,7 +13,7 @@ const StackNav =()=>{
             {/* <Stack.Screen name='Login' component={Login}/> */}
             {/* <Stack.Screen name='Register' component={Register} options={{headerShown:true}}/>
             <Stack.Screen name='Recover' component={ForgotPassword} options={{headerShown:true}}/> */}
-            <Stack.Screen name='HomeUser' component={U_ButtonNav}/>
+            <Stack.Screen name='HomeUser' component={UserStack}/>
             <Stack.Screen name='HomeVendor' component={V_ButtonNav}/>
         </Stack.Navigator>
     )
