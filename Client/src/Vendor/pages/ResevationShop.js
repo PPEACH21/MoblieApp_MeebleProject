@@ -179,9 +179,9 @@ export default function ReserveShop() {
   /* ---------- UI blocks ---------- */
   const Tabs = () => (
     <View
-      style={{
+       style={{
         flexDirection: "row",
-        flexWrap: "wrap",
+        justifyContent:'space-evenly',
         paddingHorizontal: 16,
         paddingTop: 10,
         paddingBottom: 6,
@@ -197,8 +197,8 @@ export default function ReserveShop() {
             style={{
               paddingHorizontal: 12,
               paddingVertical: 8,
-              borderRadius: 999,
-              backgroundColor: active ? c.S2 : c.S3,
+              borderRadius: 10,
+              backgroundColor: active ? c.S1 : c.S4,
               borderWidth: active ? 0 : 1,
               borderColor: c.S3,
             }}

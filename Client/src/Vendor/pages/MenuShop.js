@@ -1,5 +1,5 @@
 // src/Vendor/MenuShop.jsx
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import { api } from "../../api/axios";
 import { useDispatch, useSelector } from "react-redux";
 import { BaseColor as c } from "../../components/Color";
 import { useEffect } from "react";
+import { Btn } from "../../components/Button";
 
 /* ---------- config ---------- */
 const { imgbbKey } = Constants?.expoConfig?.extra ?? {};
@@ -483,6 +484,8 @@ export default function MenuShop() {
             ListHeaderComponent={
               <View
                 style={{
+                  marginTop:15,
+                  marginBottom:15,
                   paddingBottom: 6,
                   flexDirection: "row",
                   alignItems: "center",
@@ -497,7 +500,7 @@ export default function MenuShop() {
                 <Pressable
                   onPress={openCreate}
                   style={{
-                    backgroundColor: c.S2,
+                    backgroundColor: c.S1,
                     paddingHorizontal: 14,
                     paddingVertical: 8,
                     borderRadius: 10,
@@ -578,7 +581,7 @@ export default function MenuShop() {
               <View
                 style={{
                   flex: 1,
-                  backgroundColor: "rgba(0,0,0,0.25)",
+                  backgroundColor: "rgba(0,0,0,0.2)",
                   alignItems: "center",
                   justifyContent: "flex-end",
                 }}
@@ -610,9 +613,10 @@ export default function MenuShop() {
                     {/* รูปภาพ + ปุ่มเลือกรูป */}
                     <View
                       style={{
-                        flexDirection: "row",
+                        flexDirection: "columns",
+                        justifyContent:'center',
                         alignItems: "center",
-                        marginBottom: 12,
+                        marginBottom: 20,
                       }}
                     >
                       {localImageUri ? (
@@ -629,8 +633,8 @@ export default function MenuShop() {
                         <Image
                           source={{ uri: form.image }}
                           style={{
-                            width: 80,
-                            height: 80,
+                            width: 90,
+                            height: 90,
                             borderRadius: 12,
                             backgroundColor: c.S3,
                           }}
@@ -638,8 +642,8 @@ export default function MenuShop() {
                       ) : (
                         <View
                           style={{
-                            width: 80,
-                            height: 80,
+                            width: 90,
+                            height: 90,
                             borderRadius: 12,
                             backgroundColor: c.S3,
                             alignItems: "center",
@@ -661,11 +665,11 @@ export default function MenuShop() {
                       <Pressable
                         onPress={onPickImage}
                         style={{
-                          marginLeft: 12,
+                          marginTop: 3,
                           paddingHorizontal: 12,
                           paddingVertical: 10,
                           borderRadius: 10,
-                          backgroundColor: c.S2,
+                          backgroundColor: c.S5,
                           opacity: uploadingImage ? 0.7 : 1,
                         }}
                         disabled={uploadingImage}
@@ -680,6 +684,7 @@ export default function MenuShop() {
                       </Pressable>
                     </View>
 
+                          
                     <Text
                       style={{ color: c.black, opacity: 0.8, marginBottom: 6 }}
                     >
@@ -785,37 +790,35 @@ export default function MenuShop() {
                         marginTop: 14,
                       }}
                     >
-                      {mode === "edit" ? (
-                        <Pressable
-                          onPress={() =>
-                            confirmDelete({ id: editingId, name: form.name })
-                          }
-                          style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            borderRadius: 10,
-                            backgroundColor: "#fee2e2",
-                          }}
-                          disabled={submitting || uploadingImage}
-                        >
-                          <Text style={{ color: "#b91c1c", fontWeight: "700" }}>
-                            ลบเมนู
-                          </Text>
-                        </Pressable>
-                      ) : (
-                        <View />
-                      )}
-
-                      <View style={{ flexDirection: "row" }}>
+                    <View style={{ flex:1,flexDirection: "row", justifyContent:'space-evenly' }}>
+                        {mode === "edit" &&(
+                          <Pressable
+                            onPress={() =>
+                              confirmDelete({ id: editingId, name: form.name })
+                            }
+                            style={{
+                              paddingHorizontal: 30,
+                              paddingVertical: 10,
+                              borderRadius: 10,
+                              backgroundColor: "#fee2e2",
+                            }}
+                            disabled={submitting || uploadingImage}
+                          >
+                            <Text style={{ color: "#b91c1c", fontWeight: "700" }}>
+                              ลบเมนู
+                            </Text>
+                          </Pressable>
+                        )
+                        }
+                      
                         <Pressable
                           onPress={() => setOpenModal(false)}
-                          style={{
-                            paddingHorizontal: 14,
+                          style={[Btn.Btn2,{
+                            paddingHorizontal: 30,
                             paddingVertical: 10,
                             borderRadius: 10,
-                            backgroundColor: c.S3,
-                            marginRight: 8,
-                          }}
+                            backgroundColor: c.fullwhite,
+                          }]}
                           disabled={submitting || uploadingImage}
                         >
                           <Text style={{ color: c.black, fontWeight: "700" }}>
@@ -825,13 +828,13 @@ export default function MenuShop() {
 
                         <Pressable
                           onPress={onSubmit}
-                          style={{
-                            paddingHorizontal: 14,
+                          style={[Btn.Btn1,{
+                            paddingHorizontal: 30,
                             paddingVertical: 10,
                             borderRadius: 10,
-                            backgroundColor: c.S5, // ส้มเข้มขึ้น
+                            // backgroundColor: c.S5, // ส้มเข้มขึ้น
                             opacity: submitting || uploadingImage ? 0.7 : 1,
-                          }}
+                          }]}
                           disabled={submitting || uploadingImage}
                         >
                           <Text

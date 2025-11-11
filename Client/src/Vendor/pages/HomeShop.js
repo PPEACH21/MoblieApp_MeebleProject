@@ -7,6 +7,7 @@ import {
   StatusBar,
   ActivityIndicator,
   Pressable,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BaseColor as c } from "../../components/Color";
@@ -111,17 +112,14 @@ const filterToday = (orders = []) =>
   orders.filter((o) => isSameDayLocal(o.createdAt));
 
 /* ---------- component ---------- */
-export default function HomeShop() {
-  const Dispath = useDispatch();
+export default function HomeShop({navigation}) {
   const Auth = useSelector((state) => state.auth);
   const [shop, setShop] = useState(null);
   const [shopId, setShopId] = useState(null);
-  const headers = Auth.token
-    ? { Authorization: `Bearer ${Auth.token}` }
-    : undefined;
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
-  // console.log(Auth)
+  const [refreshing, setRefreshing] = useState(false);
+  
   // KPI (คำนวณเองใน FE)
   const [stats, setStats] = useState({
     todaySales: 0,
@@ -141,22 +139,22 @@ export default function HomeShop() {
 
   const tryGet = async (url) => {
     try {
-      const { data } = await api.get(url, { headers });
+      const { data } = await api.get(url);
       return data;
     } catch {
       return null;
     }
   };
   const getShopId = useCallback(async () => {
-    if (!Auth?.user || !Auth?.token) return; // รอ auth พร้อมก่อน
+    if (!Auth?.user) return; // รอ auth พร้อมก่อน
     try {
-      const { data } = await api.get(`/shop/by-id/${Auth.user}`, { headers });
+      const { data } = await api.get(`/shop/by-id/${Auth.user}`);
       setShopId(data?.id ?? null);
     } catch (e) {
       console.log("Could not find shop for user", e?.message);
       setShopId(null);
     }
-  }, [Auth?.user, Auth?.token]); // ไม่ต้องใส่ api ใน deps
+  }, [Auth?.user]); // ไม่ต้องใส่ api ใน deps
 
   useEffect(() => {
     getShopId();
@@ -167,7 +165,7 @@ export default function HomeShop() {
     setLoading(true);
     setErr(null);
     try {
-      const { data } = await api.get(`/shop/${shopId}`, { headers });
+      const { data } = await api.get(`/shop/${shopId}`);
       const shopData = data?.shop || data || null;
       if (!shopData) throw new Error("ยังไม่มีร้าน โปรดสร้างร้านก่อน");
       setShop(normalizeShop(shopData));
@@ -176,18 +174,17 @@ export default function HomeShop() {
     } finally {
       setLoading(false);
     }
-  }, [shopId, Auth?.token]);
+  }, [shopId]);
 
   /* ดึง orders (recent, today, all) เพื่อใช้คำนวณ KPI เอง */
   const fetchOrdersForKPI = useCallback(async () => {
     if (!shopId) return;
     setOrdersLoading(true);
 
-    // recent 8
     const candRecent = [
-      `/shop/${shopId}/orders/recent?limit=8`,
-      `/orders/recent?shopId=${shopId}&limit=8`,
-      `/shops/${shopId}/orders?recent=true&limit=8`,
+      `/shop/${shopId}/orders/`,
+      `/orders/recent?shopId=${shopId}`,
+      `/shops/${shopId}/orders?recent=&limit=8`,
     ];
     let recent = null;
     for (const u of candRecent) {
@@ -197,7 +194,10 @@ export default function HomeShop() {
         break;
       }
     }
-    setOrdersRecent(recent || []);
+
+
+    const sortOrderRecent = recent.filter(data => data.status != "completed");
+    setOrdersRecent(sortOrderRecent || []);
 
     // today
     const candToday = [
@@ -235,7 +235,21 @@ export default function HomeShop() {
     setOrdersAll(allList || todayList || []);
 
     setOrdersLoading(false);
-  }, [shopId, Auth?.token]);
+  }, [shopId]);
+
+   const onRefresh = useCallback(async () => {
+  setRefreshing(true);
+  try {
+    await getShopId();         
+    await fetchShop();         
+    await fetchOrdersForKPI();
+    await fetchReservesToday(); 
+  } catch (e) {
+    console.log("Refresh error", e);
+  } finally {
+    setRefreshing(false);
+  }
+}, [getShopId, fetchShop, fetchOrdersForKPI, fetchReservesToday]);
 
   const fetchReservesToday = useCallback(async () => {
     if (!shopId) return;
@@ -256,7 +270,7 @@ export default function HomeShop() {
     }
     setReservesToday(list || []);
     setReservesLoading(false);
-  }, [shopId, Auth?.token]);
+  }, [shopId]);
 
   /* คำนวณ KPI */
   useEffect(() => {
@@ -339,12 +353,12 @@ export default function HomeShop() {
   const EmptyRow = ({ text = "ยังไม่มีข้อมูล" }) => (
     <View
       style={{
+        width:'100%',
         height: 96,
-        borderRadius: 12,
+        borderRadius: 16,
         backgroundColor: c.S4,
         alignItems: "center",
         justifyContent: "center",
-        marginRight: 12,
         paddingHorizontal: 16,
       }}
     >
@@ -356,17 +370,19 @@ export default function HomeShop() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
       <StatusBar barStyle="dark-content" />
       <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />}
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingTop: 30,
           paddingLeft: 20,
           paddingRight: 20,
           paddingBottom: 24,
+          gap:15
         }}
       >
-        {/* Header */}
-        <Text style={{ fontSize: 20, marginBottom: 10, color: c.black }}>
-          ร้าน: {shopName}
+
+        <Text style={{ fontSize: 20, marginBottom: 10, color: c.black ,fontWeight:'bold'}}>
+          ร้าน : {shopName}
         </Text>
 
         {/* โหลด/แสดง error ร้าน */}
@@ -432,16 +448,16 @@ export default function HomeShop() {
                     key={k.key}
                     style={{
                       backgroundColor: k.bg,
-                      width: 240,
-                      height: 110,
-                      marginRight: 12,
-                      borderRadius: 16,
+                      width: 150,
+                      height: 100,
+                      marginRight: 10,
+                      borderRadius: 20,
                       padding: 14,
-                      justifyContent: "space-between",
+                      justifyContent: "space-evenly",
                     }}
                   >
                     <Text
-                      style={{ color: c.fullwhite, opacity: 0.9, fontSize: 13 }}
+                      style={{ color: c.fullwhite,textAlign:'center',fontWeight:'bold' ,opacity: 0.9, fontSize: 13 }}
                     >
                       {k.label}
                     </Text>
@@ -450,6 +466,7 @@ export default function HomeShop() {
                         color: c.fullwhite,
                         fontSize: 22,
                         fontWeight: "800",
+                        textAlign:'center',
                       }}
                     >
                       {k.value}
@@ -465,8 +482,8 @@ export default function HomeShop() {
         <Section
           title="ออเดอร์ล่าสุด"
           right={
-            <Pressable onPress={() => {}}>
-              <Text style={{ color: c.black, opacity: 0.6 }}>ดูทั้งหมด</Text>
+            <Pressable onPress={() =>navigation.navigate("Orders")}>
+              <Text style={{ color: c.S1, fontWeight:'bold' }}>ดูทั้งหมด</Text>
             </Pressable>
           }
         >
@@ -476,9 +493,9 @@ export default function HomeShop() {
             </View>
           ) : (
             <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 12 }}
+              style={{height:120,width:"100%"}} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{paddingBottom:30, alignItems:"center", gap:10}}
             >
               {ordersRecent.length === 0 && (
                 <EmptyRow text="ยังไม่มีออเดอร์วันนี้" />
@@ -488,21 +505,20 @@ export default function HomeShop() {
                   key={o.id}
                   onPress={() => {}}
                   style={{
-                    width: 260,
-                    height: 120,
+                    width: "100%",
+                    height: 90,
                     borderRadius: 16,
                     backgroundColor: c.fullwhite,
-                    borderWidth: 1,
+                    borderWidth: 2,
                     borderColor: c.S3,
-                    padding: 14,
+                    padding: 12,
                     justifyContent: "space-between",
-                    marginRight: 12,
                   }}
                 >
                   <Text
-                    style={{ fontSize: 16, fontWeight: "700", color: c.black }}
+                    style={{ fontSize: 16, color: c.black }}
                   >
-                    {o.customer}
+                    #{o.id}
                   </Text>
                   <View
                     style={{
@@ -516,6 +532,9 @@ export default function HomeShop() {
                     <Text style={{ color: c.black, opacity: 0.6 }}>
                       {o.createdAt
                         ? o.createdAt.toLocaleTimeString("th-TH", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",  
                             hour: "2-digit",
                             minute: "2-digit",
                           })
@@ -546,9 +565,8 @@ export default function HomeShop() {
             </View>
           ) : (
             <ScrollView
-              horizontal
+              style={{width:'100%'}}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 12 }}
             >
               {reservesToday.length === 0 && (
                 <EmptyRow text="ยังไม่มีการจองวันนี้" />
@@ -558,6 +576,8 @@ export default function HomeShop() {
                   key={r.id}
                   onPress={() => {}}
                   style={{
+                    flexWrap:'wrap',
+                    alignContent:'center',
                     width: 220,
                     height: 100,
                     borderRadius: 16,
@@ -566,7 +586,6 @@ export default function HomeShop() {
                     borderColor: c.S3,
                     padding: 14,
                     justifyContent: "space-between",
-                    marginRight: 12,
                   }}
                 >
                   <Text
@@ -586,6 +605,9 @@ export default function HomeShop() {
                     <Text style={{ color: c.black, opacity: 0.6 }}>
                       {r.startAt
                         ? r.startAt.toLocaleTimeString("th-TH", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",    
                             hour: "2-digit",
                             minute: "2-digit",
                           })
