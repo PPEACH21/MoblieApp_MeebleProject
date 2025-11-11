@@ -13,7 +13,7 @@ import { loginUser,registerID } from "../redux/actions/authAction";
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { getLocale,setLocale } from "../paraglide/runtime";
-import { m } from "../paraglide/messages";
+import {m} from "../paraglide/messages";
 
 const Splash = ({ navigation }) => {
     //AUTH 
@@ -21,22 +21,17 @@ const Splash = ({ navigation }) => {
     const Auth = useSelector((state) => state.auth); 
     const CheckAuth =()=>{
         console.log("Loading Auth");
+        console.log(Auth);
+
         if (!Auth.user || Auth.loading) return;
-        if (!Auth.verified){
+        if (Auth.user && !Auth.verified){
             navigation.replace("verifyotp")
-        }else if (Auth.role==="user") {
+        }else if (Auth.role==="user" && Auth.verified) {
             navigation.replace("HomeUser")
-        }else if (Auth.role==="vendor") {
+        }else if (Auth.role==="vendor" && Auth.verified) {
             navigation.replace("HomeVendor")
         }
     }
-
-    useEffect(() => {
-    if (Auth.user) {
-        console.log("USER:", Auth.user);
-        CheckAuth(); 
-    }
-    }, [Auth.user]);
     //AUTH
 
     //AnimationSet
@@ -224,6 +219,7 @@ const Splash = ({ navigation }) => {
     useEffect(() => {
         bounceAndSlide();
         WelcomeSlice();
+        CheckAuth()
     }, []);
 
     useEffect(() => {
@@ -279,8 +275,9 @@ const Splash = ({ navigation }) => {
             return setErrmsg("your must fill information")
         }
         Dispath(loginUser({
-            Username:logininput.Username,
-            Password:logininput.Password,
+            username:logininput.Username,
+            email:logininput.Username,
+            password:logininput.Password,
         }))
     }
     const SubmitRegister=()=>{
@@ -476,7 +473,11 @@ const Splash = ({ navigation }) => {
                     <TextInputSplash name={"Username"} type={"text"} setvalue={(text) => setLogininput({ ...logininput, Username: text })} value={logininput.Username} />
                     <TextInputSplash name={"Password"} type={"password"} setvalue={(text) => setLogininput({ ...logininput, Password: text })} value={logininput.Password} />
 
-                    <Text style={{ alignSelf: 'flex-end' ,color:c.blue}}>ForgotPassword</Text>
+                    <TouchableOpacity
+                        onPress={()=>{navigation.navigate("verifyotp")}}
+                    >
+                        <Text style={{ alignSelf: 'flex-end' ,color:c.blue}}>ForgotPassword</Text>
+                    </TouchableOpacity>
                     {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
                     <TouchableOpacity
                         style={[Btn.Btn1, { width:'100%'}]}
