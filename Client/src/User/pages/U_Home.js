@@ -55,7 +55,7 @@ const U_Home = () => {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (shops || []).filter((it) => {
-      const status = (it.status || "").toLowerCase();
+      const status = (it.status || false);
       const isOpen = status === "open" || status === "active";
       const reservable = !!it.reserve_active;
 
@@ -72,7 +72,7 @@ const U_Home = () => {
 
   // การ์ด
   const renderShop = ({ item }) => {
-    const s = (item.status || "").toLowerCase();
+    const s = (item.status || false);
     const isOpen = s === "open" || s === "active";
     const isClosed = !isOpen;
 

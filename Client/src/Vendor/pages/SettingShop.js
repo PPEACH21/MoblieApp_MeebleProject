@@ -101,10 +101,11 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 12,
+    paddingHorizontal:10,
     marginBottom: 8,
   },
   primaryBtn: {
-    backgroundColor: BaseColor.S2,
+    backgroundColor: BaseColor.S1,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
@@ -318,18 +319,17 @@ export default function SettingShop() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
-  // ✅ ตัวเปิด/ปิดรายการประเภท
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const getShopId = useCallback(async () => {
-    if (!Auth?.user || !Auth?.token) return; // รอ auth พร้อมก่อน
+    if (!Auth?.user) return; // รอ auth พร้อมก่อน
     try {
-      const response = await api.get(`/shop/by-id/${Auth.user}`, { headers });
+      const response = await api.get(`/shop/by-id/${Auth.user}`);
       setShopId(response?.data?.id ?? null);
     } catch (e) {
       console.log("Could not find shop for user", e?.message);
       setShopId(null);
     }
-  }, [Auth?.user, Auth?.token]); // ไม่ต้องใส่ api ใน deps
+  }, [Auth?.user]); // ไม่ต้องใส่ api ใน deps
 
   useEffect(() => {
     getShopId();
@@ -340,7 +340,7 @@ export default function SettingShop() {
     try {
       setLoading(true);
       setErr(null);
-      const res = await api.get(`/shop/${shopId}`, { headers });
+      const res = await api.get(`/shop/${shopId}`);
       const found = res?.data?.shop ?? res?.data ?? null;
       if (!found) {
         setErr({ status: 404, message: "ยังไม่มีร้าน โปรดสร้างร้านก่อน" });
@@ -352,7 +352,7 @@ export default function SettingShop() {
     } finally {
       setLoading(false);
     }
-  }, [shopId, Auth?.token]);
+  }, [shopId]);
 
   useEffect(() => {
     if (!shopId) return;
@@ -367,7 +367,7 @@ export default function SettingShop() {
       });
       setShop((prev) => (prev ? { ...prev, ...patch } : prev));
     },
-    [shop?.ID, shop?.id, shopId, Auth?.token]
+    [shop?.ID, shop?.id, shopId]
   );
 
   const isOpen = (shop?.status || STATUS_OPEN) === STATUS_OPEN;
