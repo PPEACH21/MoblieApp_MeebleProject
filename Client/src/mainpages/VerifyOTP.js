@@ -15,6 +15,8 @@ const VerifyOTP = ({ navigation}) => {
   const Auth = useSelector((state) => state.auth);
   
   const [email,setEmail] = useState("");
+  const [newPassword,setNewpassword] = useState("");
+  const [conNewPassword,setconNewPassword] = useState("");
   const [state,setState] = useState(1);
   useEffect(() => {
     sendmessage();
@@ -97,7 +99,7 @@ const VerifyOTP = ({ navigation}) => {
   
   const handleVerify =async() => {
     const code = otp.join("");
-    console.log("🔢 OTP:", code);
+    console.log("OTP:", code);
     if (code.length === 6) {
       try{
         if (Auth.user) {
@@ -128,6 +130,25 @@ const VerifyOTP = ({ navigation}) => {
       alert("กรุณากรอกรหัสให้ครบ 6 หลัก");
     }
   };
+
+  const SubmitPassword=async()=>{
+      try{
+          if(newPassword.length<8 || conNewPassword.length<8)
+              return setErrmsg("password must have 8")
+          if(conNewPassword!=newPassword){
+              return setErrmsg("Password Notmatch")
+          }
+
+          setErrmsg("")            
+          const res = await api.put("/changepassword", {email:email,password:newPassword});
+          console.log("changePassword Success",res)
+          navigation.replace("Splash")
+      }catch(err){
+          console.log("Email not Correct",err)
+          setErrmsg("Email not Correct");
+      }
+  }
+
 
    return (
     <View style={[Layout.container ,Layout.centerset,{gap:40}]}>
@@ -194,6 +215,21 @@ const VerifyOTP = ({ navigation}) => {
           >
             {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
             <Text style={[Btn.textBtn1]}>ยืนยันรหัส</Text>
+          </TouchableOpacity>
+        </View>
+      )} 
+
+       {state===2&&(
+        <View style={{width:'80%', gap:20}}>
+          <TextInputSplash name="new password" value={newPassword} setvalue={setNewpassword} type={"password"}/>
+          <TextInputSplash name="Confirm new password" value={conNewPassword} setvalue={setconNewPassword} type={"password"}/>
+          
+          {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
+          <TouchableOpacity
+            style={[Btn.Btn1,{paddingHorizontal:40}]} 
+            onPress={SubmitPassword}
+          >
+            <Text style={[Btn.textBtn1]}>ยืนยัน</Text>
           </TouchableOpacity>
         </View>
       )} 

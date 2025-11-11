@@ -101,7 +101,7 @@ func CreateUser(c *fiber.Ctx) error {
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	
+
 	return c.JSON(fiber.Map{
 		"user_id":	docRef.ID,
 		"verified":  false,
@@ -118,11 +118,13 @@ func ChangePassword(c *fiber.Ctx)error{
         "error": "Invalid request body",
     })
 	}
-	// fmt.Println(user)
 	
 	data,err := config.User.Where("email","==",user.Email).Documents(config.Ctx).GetAll()
 	if err!=nil{
-		return c.Status(fiber.StatusBadGateway).SendString("Get data error")
+		data,err = config.Vendor.Where("email","==",user.Email).Documents(config.Ctx).GetAll()
+		if err!=nil{
+			return c.Status(fiber.StatusBadGateway).SendString("Get data error")
+		}
 	}
 	
 	if len(data) == 0 {
