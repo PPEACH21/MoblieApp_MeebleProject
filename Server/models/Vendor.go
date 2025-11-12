@@ -92,7 +92,3 @@ type Cart struct {
 }
 
 // ----- DTO (request bodies) -----
-
-type UpdateReservationReq struct {
-	Status string `json:"status"` // pending|confirmed|canceled|done
-}
