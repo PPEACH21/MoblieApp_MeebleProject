@@ -3,17 +3,17 @@ package models
 import "time"
 
 type User = struct {
-	Email      string    `json:"email" firestore:"email"`
-	Avatar     string    `json:"avatar" firestore:"avatar"`
-	Firstname  string    `json:"firstname" firestore:"firstname"`
-	Lastname   string    `json:"lastname" firestore:"lastname"`
-	Phone      string    `json:"phone" firestore:"phone"`
-	Username   string    `json:"username" firestore:"username"`
-	Password   string    `json:"password" firestore:"password"`
-	Role string    		`json:"role" firestore:"role"`
-	Verified   bool      `json:"verified" firestore:"verified"`
-	Cost       int       `json:"cost" firestore:"cost"`
-	CreatedAt  time.Time `json:"createdAt" firestore:"createdAt"`
+	Email     string    `json:"email" firestore:"email"`
+	Avatar    string    `json:"avatar" firestore:"avatar"`
+	Firstname string    `json:"firstname" firestore:"firstname"`
+	Lastname  string    `json:"lastname" firestore:"lastname"`
+	Phone     string    `json:"phone" firestore:"phone"`
+	Username  string    `json:"username" firestore:"username"`
+	Password  string    `json:"password" firestore:"password"`
+	Role      string    `json:"role" firestore:"role"`
+	Verified  bool      `json:"verified" firestore:"verified"`
+	Cost      int       `json:"cost" firestore:"cost"`
+	CreatedAt time.Time `json:"createdAt" firestore:"createdAt"`
 }
 
 type Select = struct {
@@ -40,4 +40,19 @@ type OrderDTO struct {
 }
 type TopUpRequest struct {
 	Amount int64 `json:"amount"`
+}
+
+// models/history.go
+
+type HistoryItem struct {
+	ID               string    `json:"id" firestore:"-"` // doc id (== historyId)
+	HistoryID        string    `json:"historyId" firestore:"historyId"`
+	OrderID          string    `json:"orderId" firestore:"orderId"`
+	UserID           string    `json:"userId" firestore:"userId"`
+	ShopID           string    `json:"shopId" firestore:"shopId"`
+	Status           string    `json:"status" firestore:"status"`
+	Total            float64   `json:"total" firestore:"total"`
+	CreatedAt        time.Time `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt" firestore:"updatedAt"`
+	MovedToHistoryAt time.Time `json:"movedToHistoryAt" firestore:"movedToHistoryAt"`
 }

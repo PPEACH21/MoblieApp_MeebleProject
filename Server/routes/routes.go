@@ -30,11 +30,13 @@ func Routes(app *fiber.App) {
 	/* ---------- ORDERS ---------- */
 	app.Post("/orders", controllers.CreateOrder)
 	app.Get("/orders", controllers.ListAllOrders)
+	app.Get("/userOrders", controllers.ListUserOrders)
 	app.Get("/shop/:shopId/orders", controllers.ListOrdersByShop)
 	app.Get("/orders/:orderId", controllers.GetOrderByID)
 	app.Put("/orders/:orderId/status", controllers.UpdateOrderStatus)
 	app.Get("/shop/:shopId/history", controllers.ListHistoryByShop)
-
+	app.Get("/users/:userId/history", controllers.ListUserHistory)
+	app.Get("/:uid/history/:historyId", controllers.GetUserHistoryDetail)
 	/* ---------- RESERVATIONS ---------- */
 	app.Post("/shops/:id/reservations", controllers.CreateReservation)
 	app.Get("/shops/:id/reservations", controllers.ListReservationsByShop)

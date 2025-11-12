@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	"github.com/PPEACH21/MoblieApp_MeebleProject/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"google.golang.org/api/iterator"
 )
 
 func VerifiedUser(c *fiber.Ctx) error {
@@ -199,6 +200,7 @@ func GetCart(c *fiber.Ctx) error {
 
 // POST /api/cart/add
 func AddToCart(c *fiber.Ctx) error {
+	// รับ payload หลัก
 	var req models.AddToCartRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -206,30 +208,29 @@ func AddToCart(c *fiber.Ctx) error {
 		})
 	}
 
-	// ตรวจ required fields
+	// รองรับกรณี FE ส่ง shopName แทน shop_name
+	// (อ่านทับอีกครั้งเฉพาะฟิลด์ shopName)
+	var alias struct {
+		ShopName string `json:"shopName"`
+	}
+	_ = c.BodyParser(&alias)
+	if strings.TrimSpace(req.Shop_name) == "" && strings.TrimSpace(alias.ShopName) != "" {
+		req.Shop_name = alias.ShopName
+	}
+
+	// ตรวจ required fields แบบที่คุณต้องการจริง ๆ
 	missing := []string{}
 	if strings.TrimSpace(req.CustomerID) == "" {
 		missing = append(missing, "customerId")
-	}
-	if strings.TrimSpace(req.UserID) == "" {
-		missing = append(missing, "userId")
 	}
 	if strings.TrimSpace(req.ShopID) == "" {
 		missing = append(missing, "shopId")
 	}
 	if strings.TrimSpace(req.Shop_name) == "" {
-		// รองรับ FE ส่ง shopName
-		if v := reflect.ValueOf(req).FieldByName("ShopName"); v.IsValid() {
-			if s, ok := v.Interface().(string); ok && strings.TrimSpace(s) != "" {
-				req.Shop_name = s
-			}
-		}
-		if strings.TrimSpace(req.Shop_name) == "" {
-			missing = append(missing, "shop_name")
-		}
+		missing = append(missing, "shop_name")
 	}
 	if strings.TrimSpace(req.Item.MenuID) == "" {
-		missing = append(missing, "menuId")
+		missing = append(missing, "item.menuId")
 	}
 	if req.Qty <= 0 {
 		missing = append(missing, "qty (> 0)")
@@ -239,12 +240,15 @@ func AddToCart(c *fiber.Ctx) error {
 			"error":   "missing required fields",
 			"missing": missing,
 			"exampleBody": map[string]any{
-				"customerId": "peach",
-				"userId":     "abc123",
-				"shopId":     "Shop01",
-				"shop_name":  "KU Canteen",
+				"customerId": "user123",
+				"shopId":     "9WRq2etVYWSISP1pJUAS",
+				"shop_name":  "TOWN in TOWN",
 				"item": map[string]any{
-					"menuId": "MENU001",
+					"menuId":      "LW0EwC50rlKk4cZ4SZkH",
+					"name":        "กุ้งๆๆๆ",
+					"price":       200,
+					"image":       "https://...",
+					"description": "กุ้งๆๆ",
 				},
 				"qty": 1,
 			},
@@ -252,41 +256,17 @@ func AddToCart(c *fiber.Ctx) error {
 		})
 	}
 
-	// เติมข้อมูลเมนูถ้าขาด (optional)
-	if (req.Item.Name == "" || req.Item.Price <= 0 || req.Item.Image == "" || req.Item.Description == "") && req.VendorID != "" {
-		if m, err := loadMenuByID(req.VendorID, req.Item.MenuID); err == nil {
-			if req.Item.Name == "" {
-				req.Item.Name = m.Name
-			}
-			if req.Item.Price <= 0 {
-				req.Item.Price = m.Price
-			}
-			if req.Item.Image == "" {
-				req.Item.Image = m.Image
-			}
-			if req.Item.Description == "" {
-				req.Item.Description = m.Description
-			}
-		}
-	}
-
-	userRef := config.Client.Collection("users").Doc(req.UserID)
-
-	var menuRef *firestore.DocumentRef
-	if req.VendorID != "" {
-		menuRef = config.Client.Collection("vendors").Doc(req.VendorID).
-			Collection("menu").Doc(req.Item.MenuID)
-	}
-
 	ref := topCartDoc(req.CustomerID)
 
 	err := config.Client.RunTransaction(config.Ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		// โหลดตะกร้าเดิม
 		var cart models.Cart
 		snap, err := tx.Get(ref)
 		if err != nil || !snap.Exists() {
 			cart = models.Cart{
 				CustomerID: req.CustomerID,
 				Shop_name:  req.Shop_name,
+				ShopID:     req.ShopID,
 				Items:      []models.CartItem{},
 				Total:      0,
 				UpdatedAt:  time.Now(),
@@ -295,44 +275,41 @@ func AddToCart(c *fiber.Ctx) error {
 			return err
 		}
 
-		// Lock ด้วย shopId
-		existingShop := ""
-		if len(cart.Items) > 0 {
-			existingShop = cart.Items[0].ShopID
-		}
+		// 🔒 ล็อกตะกร้าให้สั่งได้จากร้านเดียว
+		existingShop := cart.ShopID
 		incomingShop := req.ShopID
 		if len(cart.Items) > 0 {
 			if existingShop == "" && incomingShop != "" {
 				existingShop = incomingShop
 			}
 			if incomingShop == "" || existingShop == "" || existingShop != incomingShop {
-				return fiber.NewError(fiber.StatusConflict,
-					fmt.Sprintf("CART_SHOP_CONFLICT: cart locked to shop=%s, incoming shop=%s", existingShop, incomingShop))
+				return fiber.NewError(
+					fiber.StatusConflict,
+					fmt.Sprintf("CART_SHOP_CONFLICT: cart locked to shop=%s, incoming shop=%s", existingShop, incomingShop),
+				)
 			}
 		}
+		// อัปเดตข้อมูลระดับ cart ให้ตรงกับร้านที่กำลังสั่ง
+		cart.ShopID = req.ShopID
+		cart.Shop_name = req.Shop_name
 
-		// รวมรายการซ้ำ (shopId + menuId)
+		// รวมรายการซ้ำ (ตาม shopId + menuId)
 		found := false
 		for i := range cart.Items {
 			if cart.Items[i].ShopID == req.ShopID && cart.Items[i].ID == req.Item.MenuID {
 				cart.Items[i].Qty += req.Qty
+				// อัปเดตราคา/ชื่อ/รูป/คำอธิบาย ถ้าส่งมา
 				if req.Item.Price > 0 {
 					cart.Items[i].Price = req.Item.Price
 				}
-				if cart.Items[i].Name == "" {
+				if req.Item.Name != "" && cart.Items[i].Name == "" {
 					cart.Items[i].Name = req.Item.Name
 				}
-				if cart.Items[i].Image == "" {
+				if req.Item.Image != "" && cart.Items[i].Image == "" {
 					cart.Items[i].Image = req.Item.Image
 				}
-				if cart.Items[i].Description == "" {
+				if req.Item.Description != "" && cart.Items[i].Description == "" {
 					cart.Items[i].Description = req.Item.Description
-				}
-				if cart.Items[i].VendorID == "" {
-					cart.Items[i].VendorID = req.VendorID
-				}
-				if cart.Items[i].MenuRef == nil {
-					cart.Items[i].MenuRef = menuRef
 				}
 				found = true
 				break
@@ -346,13 +323,12 @@ func AddToCart(c *fiber.Ctx) error {
 				Price:       req.Item.Price,
 				Image:       req.Item.Image,
 				Description: req.Item.Description,
-				VendorID:    req.VendorID,
 				ShopID:      req.ShopID,
-				MenuRef:     menuRef,
+				// VendorID/MenuRef ไม่ใช้แล้ว -> ปล่อยว่าง
 			})
 		}
 
-		// รวมยอด
+		// คำนวณยอดรวมใหม่
 		var total float64
 		for _, it := range cart.Items {
 			total += float64(it.Qty) * it.Price
@@ -360,19 +336,16 @@ func AddToCart(c *fiber.Ctx) error {
 		cart.Total = total
 		cart.UpdatedAt = time.Now()
 
-		// เขียนกลับด้วยคีย์ตัวเล็ก (ตรงกับ FE)
+		// เขียนกลับเฉพาะฟิลด์ที่ FE ใช้จริง
 		writeData := map[string]interface{}{
-			"user_id":    userRef,
 			"customerId": cart.CustomerID,
-			"shop_name":  req.Shop_name,
+			"shopId":     cart.ShopID,
+			"shop_name":  cart.Shop_name,
 			"items":      cart.Items,
 			"total":      cart.Total,
 			"updatedAt":  cart.UpdatedAt,
-			"shopId":     req.ShopID, // lock shop
 		}
-		if req.VendorID != "" {
-			writeData["vendorId"] = req.VendorID
-		}
+
 		return tx.Set(ref, writeData)
 	})
 
@@ -386,6 +359,7 @@ func AddToCart(c *fiber.Ctx) error {
 		}
 		return c.Status(500).JSON(fiber.Map{"error": "failed to add to cart", "msg": err.Error()})
 	}
+
 	return c.JSON(fiber.Map{"message": "added to cart"})
 }
 
@@ -607,4 +581,81 @@ func UpdateCartQty(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "update qty failed", "msg": err.Error()})
 	}
 	return c.JSON(fiber.Map{"message": "ok"})
+}
+func toLimit(v string, def int) int {
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def
+	}
+	if n > 200 {
+		n = 200
+	}
+	return n
+}
+
+func ListUserHistory(c *fiber.Ctx) error {
+	userId := c.Params("userId")
+	if userId == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "userId required"})
+	}
+	status := c.Query("status", "")             // เช่น completed, canceled
+	limit := toLimit(c.Query("limit"), 20)      // default 20
+	startAfterId := c.Query("startAfterId", "") // ใช้ doc id ทำหน้า next page
+
+	col := config.Client.Collection("users").Doc(userId).Collection("history")
+
+	// เลือก field สำหรับ sort: ถ้ามี movedToHistoryAt ให้ใช้เป็นหลัก
+	// (ถ้าบางเอกสารไม่มี ฟังก์ชันนี้ยังดึงได้ เพราะเรา fallback ด้วย get field จาก snapshot เดิม)
+	q := col.OrderBy("movedToHistoryAt", firestore.Desc).Limit(limit)
+	if status != "" {
+		q = q.Where("status", "==", status)
+	}
+
+	// pagination
+	if startAfterId != "" {
+		snap, err := col.Doc(startAfterId).Get(config.Ctx)
+		if err == nil {
+			// ใช้ค่า movedToHistoryAt ของ doc ที่อ้างอิงเป็น anchor
+			mv := snap.Data()["movedToHistoryAt"]
+			q = q.StartAfter(mv)
+		}
+	}
+
+	iter := q.Documents(config.Ctx)
+	defer iter.Stop()
+
+	out := make([]models.HistoryItem, 0, limit)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		var it models.HistoryItem
+		if err := doc.DataTo(&it); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "parse error: " + err.Error()})
+		}
+		// fallback: ถ้าไม่มี movedToHistoryAt (เวอร์ชันเก่า)
+		if it.MovedToHistoryAt.IsZero() {
+			// ใช้ updatedAt ถ้าไม่มีอีก ใช้ createdAt
+			if !it.UpdatedAt.IsZero() {
+				it.MovedToHistoryAt = it.UpdatedAt
+			} else if !it.CreatedAt.IsZero() {
+				it.MovedToHistoryAt = it.CreatedAt
+			}
+		}
+		it.ID = doc.Ref.ID
+		out = append(out, it)
+	}
+
+	return c.JSON(fiber.Map{
+		"userId":  userId,
+		"history": out,
+	})
 }

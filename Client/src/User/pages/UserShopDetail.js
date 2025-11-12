@@ -24,6 +24,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { BaseColor as c } from "../../components/Color";
 import { api } from "../../api/axios";
 import { Ionicons } from "@expo/vector-icons";
+import { useSelector } from "react-redux";
 
 /* ---------- helpers ---------- */
 const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
@@ -81,6 +82,7 @@ const placeholder =
 
 /* ---------- main component ---------- */
 export default function UserShopDetail() {
+  const Auth = useSelector((s) => s.auth);
   const nav = useNavigation();
   const route = useRoute();
   const initShop = route.params?.shop || null;
@@ -92,7 +94,7 @@ export default function UserShopDetail() {
   const [menus, setMenus] = useState([]);
   const [menusLoading, setMenusLoading] = useState(true);
   const [menusErr, setMenusErr] = useState(null);
-
+  const [cartShopId, setCartShopId] = useState("");
   const [qtyModalVisible, setQtyModalVisible] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState(null);
   const [qty, setQty] = useState("1");
@@ -149,6 +151,20 @@ export default function UserShopDetail() {
   useEffect(() => {
     fetchMenus();
   }, [fetchMenus]);
+  const fetchCartCount = useCallback(async () => {
+    try {
+      const customerId = getCustomerId();
+      if (!customerId) return;
+      const res = await api.get("/cart", { params: { customerId } });
+      const items = res?.data?.items || [];
+      const count = items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+      setCartCount(count);
+    } catch {}
+  }, [Auth]);
+
+  useEffect(() => {
+    fetchCartCount();
+  }, [fetchCartCount]);
 
   const openInMaps = useCallback(() => {
     const lat = shop?.address?.latitude;
@@ -159,6 +175,24 @@ export default function UserShopDetail() {
       Alert.alert("ไม่สามารถเปิดแผนที่ได้", "โปรดลองอีกครั้ง")
     );
   }, [shop]);
+  const fetchCartSummary = useCallback(async () => {
+    try {
+      const customerId = Auth.user;
+      if (!customerId) return;
+      const res = await api.get("/cart", { params: { customerId } });
+      const items = res?.data?.items || [];
+      const count = items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+      setCartCount(count);
+      setCartShopId(res?.data?.shopId || ""); // ต้องให้ BE ส่ง field นี้จากเอกสาร cart
+    } catch (e) {
+      // เงียบไว้ ไม่ต้อง alert
+      setCartCount(0);
+      setCartShopId("");
+    }
+  }, [Auth]);
+  useEffect(() => {
+    fetchCartSummary();
+  }, [fetchCartSummary]);
 
   const onPressMenuItem = (m) => {
     if (!m?.available) return;
@@ -170,13 +204,55 @@ export default function UserShopDetail() {
   const handleConfirmQty = () => {
     const n = Math.max(1, parseInt(qty, 10) || 1);
     setQtyModalVisible(false);
-    setCartCount((prev) => prev + n);
-    Alert.alert(
-      "เพิ่มลงตะกร้า",
-      `${selectedMenu?.name} × ${n}\nราคารวม: ${fmtTHB(
-        (selectedMenu?.price || 0) * n
-      )}`
-    );
+
+    (async () => {
+      try {
+        if (!shop?.status) {
+          Alert.alert("สั่งไม่ได้", "ร้านปิดอยู่ตอนนี้");
+          return;
+        }
+
+        const payload = {
+          shop_name: shop?.shop_name || "", // ✅ snake_case
+          shopId: shop?.id || "",
+          customerId: Auth.user,
+          qty: n, // ✅ > 0
+          item: {
+            menuId: selectedMenu?.id, // ✅ ต้องไม่ว่าง
+            name: selectedMenu?.name,
+            price: selectedMenu?.price,
+            image: selectedMenu?.image,
+            description: selectedMenu?.description,
+          },
+        };
+        console.log(payload);
+        await api.post("/cart/add", payload);
+        setCartCount((prev) => prev + n);
+        Alert.alert(
+          "เพิ่มลงตะกร้าแล้ว",
+          `${selectedMenu?.name} × ${n}\nราคารวม: ${fmtTHB(
+            (selectedMenu?.price || 0) * n
+          )}`
+        );
+      } catch (e) {
+        const code = e?.response?.status;
+        const msg =
+          e?.response?.data?.error || e?.message || "เพิ่มตะกร้าไม่สำเร็จ";
+
+        if (code === 409) {
+          Alert.alert(
+            "ตะกร้าถูกล็อกกับร้านอื่น",
+            "คุณมีสินค้าในตะกร้าจากร้านอื่นอยู่ โปรดชำระ/ลบของเดิมก่อน",
+            [
+              { text: "ปิด" },
+              { text: "ไปตะกร้า", onPress: () => nav.navigate("Cart") },
+            ]
+          );
+        } else {
+          Alert.alert("ผิดพลาด", msg);
+        }
+      }
+    })();
   };
 
   const statusBadge = useMemo(() => {
@@ -342,23 +418,31 @@ export default function UserShopDetail() {
             </Pressable>
           </View>
         </View>
-      </Modal>
-      {/* 🛒 Floating Cart Button */}
-      {cartCount > 0 && (
+        {/* 🛒 ปุ่มตะกร้า "ซ้อนใน Modal" เพื่อให้เห็นตลอดตอนเปิด Modal */}
         <Pressable
-          onPress={() => nav.navigate("Cart")} // ไปหน้า Cart
-          style={styles.cartFab}
+          onPress={() => nav.navigate("Cart")}
+          style={[styles.cartFab, { bottom: 24, right: 20 }]}
         >
           <Ionicons name="cart" size={24} color={c.fullwhite} />
+          {cartCount > 0 && (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeTxt}>{cartCount}</Text>
+            </View>
+          )}
+        </Pressable>
+      </Modal>
+
+      <Pressable onPress={() => nav.navigate("Cart")} style={styles.cartFab}>
+        <Ionicons name="cart" size={24} color={c.fullwhite} />
+        {cartCount > 0 && (
           <View style={styles.cartBadge}>
             <Text style={styles.cartBadgeTxt}>{cartCount}</Text>
           </View>
-        </Pressable>
-      )}
+        )}
+      </Pressable>
     </>
   );
 }
-
 /* ---------- styles ---------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.fullwhite },

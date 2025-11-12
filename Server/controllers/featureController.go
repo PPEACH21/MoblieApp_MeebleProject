@@ -161,96 +161,210 @@ func ListOrdersByShop(c *fiber.Ctx) error {
 func UpdateOrderStatus(c *fiber.Ctx) error {
 	orderId := c.Params("orderId")
 	if orderId == "" {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "orderId required"})
+		return c.Status(400).JSON(fiber.Map{"error": "orderId required"})
 	}
 
 	var body models.UpdateOrderStatusReq
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
 	}
+
 	newStatus := body.Status
 	if !models.AllowedOrderStatus[newStatus] {
-		return c.Status(http.StatusBadRequest).JSON(
-			fiber.Map{"error": fmt.Sprintf("status must be one of %v", keys(models.AllowedOrderStatus))},
-		)
+		return c.Status(400).JSON(fiber.Map{
+			"error": fmt.Sprintf("status must be one of %v", keys(models.AllowedOrderStatus)),
+		})
 	}
 
 	ref := config.Client.Collection(ColOrders).Doc(orderId)
 
 	var out models.Order
 	err := config.Client.RunTransaction(config.Ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		// อ่านเอกสารเดิม
+		// 1) อ่านเอกสารเดิม
 		snap, err := tx.Get(ref)
 		if err != nil {
 			if strings.Contains(err.Error(), "NotFound") {
-				return fiber.NewError(http.StatusNotFound, "order not found")
+				return fiber.NewError(404, "order not found")
 			}
-			return fiber.NewError(http.StatusInternalServerError, "failed to get order: "+err.Error())
+			return fiber.NewError(500, "failed to get order: "+err.Error())
 		}
 
-		// map ไป struct เพื่อใช้งานฟิลด์ shopId/userId/total ฯลฯ
+		// 2) map ไป struct สำหรับฟิลด์หลัก
 		var ord models.Order
 		if err := snap.DataTo(&ord); err != nil {
-			return fiber.NewError(http.StatusInternalServerError, "failed to parse order: "+err.Error())
+			return fiber.NewError(500, "failed to parse order: "+err.Error())
+		}
+		dataMap := snap.Data()
+
+		// fallback shopId / customerId (userId)
+		if ord.ShopID == "" {
+			if v, ok := dataMap["shopId"].(string); ok {
+				ord.ShopID = v
+			}
+		}
+		if ord.CustomerID == "" {
+			if v, ok := dataMap["customerId"].(string); ok {
+				ord.CustomerID = v
+			} else if v, ok := dataMap["userId"].(string); ok {
+				ord.CustomerID = v
+			}
 		}
 
-		// อัปเดตสถานะล่าสุดไว้ในตัวแปรตอบกลับ
+		// -------- NEW: หา shop_name ให้แน่นอน --------
+		shopName := ""
+		if v, ok := dataMap["shop_name"].(string); ok && strings.TrimSpace(v) != "" {
+			shopName = v
+		} else if v, ok := dataMap["shopName"].(string); ok && strings.TrimSpace(v) != "" {
+			shopName = v
+		}
+		// ถ้ายังไม่มี ลองอ่าน shops/{shopId} ภายใน transaction
+		if shopName == "" && ord.ShopID != "" {
+			shopRef := config.Client.Collection("shops").Doc(ord.ShopID)
+			shopSnap, err := tx.Get(shopRef)
+			if err == nil && shopSnap.Exists() {
+				if s, ok := shopSnap.Data()["name"].(string); ok && strings.TrimSpace(s) != "" {
+					shopName = s
+				} else if s, ok := shopSnap.Data()["shop_name"].(string); ok && strings.TrimSpace(s) != "" {
+					shopName = s
+				} else if s, ok := shopSnap.Data()["title"].(string); ok && strings.TrimSpace(s) != "" {
+					shopName = s
+				}
+			}
+		}
+		// ---------------------------------------------
+
+		// 3) เตรียม normalize รายการเมนู (qty=int, price=float64, เก็บ extras)
+		mapToItem := func(m map[string]interface{}) models.OrderItem {
+			it := models.OrderItem{}
+
+			// id (menuId)
+			if s, ok := m["id"].(string); ok && s != "" {
+				it.ID = s
+			}
+			if it.ID == "" {
+				if s, ok := m["menuId"].(string); ok && s != "" {
+					it.ID = s
+				}
+			}
+
+			if s, ok := m["name"].(string); ok {
+				it.Name = s
+			}
+			if s, ok := m["image"].(string); ok {
+				it.Image = s
+			}
+			if s, ok := m["description"].(string); ok {
+				it.Description = s
+			}
+
+			// price -> float64
+			switch v := m["price"].(type) {
+			case float64:
+				it.Price = v
+			case int:
+				it.Price = float64(v)
+			case int64:
+				it.Price = float64(v)
+			}
+
+			// qty -> int
+			switch v := m["qty"].(type) {
+			case int:
+				it.Qty = v
+			case int64:
+				it.Qty = int(v)
+			case float64:
+				it.Qty = int(v)
+			}
+
+			// extras (อะไรก็ได้)
+			if ex, ok := m["extras"]; ok {
+				it.Extras = ex
+			}
+
+			return it
+		}
+
+		normalizeItems := func(raw any) []models.OrderItem {
+			out := make([]models.OrderItem, 0)
+			switch v := raw.(type) {
+			case []interface{}:
+				for _, one := range v {
+					m, ok := one.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					out = append(out, mapToItem(m))
+				}
+			case []map[string]interface{}:
+				for _, m := range v {
+					out = append(out, mapToItem(m))
+				}
+			default:
+				// unsupported -> empty
+			}
+			return out
+		}
+
+		var items []models.OrderItem
+		if raw, ok := dataMap["items"]; ok && raw != nil {
+			items = normalizeItems(raw)
+		} else if raw, ok := dataMap["order_items"]; ok && raw != nil { // เผื่อชื่ออื่น
+			items = normalizeItems(raw)
+		}
+
+		// 4) ตั้งค่าจะส่งคืน + อัปเดตเวลา
 		ord.ID = snap.Ref.ID
 		ord.Status = newStatus
 		ord.UpdatedAt = now()
 
-		// ถ้า "completed" → ย้ายไป history แล้วลบจาก orders
+		// 5) ถ้า completed → ย้ายไป history (shop + user) แล้วลบจาก orders
 		if newStatus == "completed" {
 			if ord.ShopID == "" {
-				// เผื่อกรณี field ในฐานข้อมูลสะกดแบบ camel-case
-				// ลองดึงจาก map โดยตรง
-				if raw, ok := snap.Data()["shopId"]; ok {
-					if s, ok2 := raw.(string); ok2 {
-						ord.ShopID = s
-					}
-				}
+				return fiber.NewError(400, "order missing shopId")
 			}
-			if ord.ShopID == "" {
-				return fiber.NewError(http.StatusBadRequest, "order missing shopId")
+			if ord.CustomerID == "" {
+				return fiber.NewError(400, "order missing customerId")
 			}
 
-			historyRef := config.Client.
-				Collection("shops").
-				Doc(ord.ShopID).
-				Collection("history").
-				Doc(orderId)
+			shopHistoryRef := config.Client.Collection("shops").Doc(ord.ShopID).Collection("history").Doc(orderId)
+			userHistoryRef := config.Client.Collection("users").Doc(ord.CustomerID).Collection("history").Doc(orderId)
 
-			// เตรียมข้อมูลที่จะเก็บใน history
 			payload := map[string]interface{}{
+				"historyId":        orderId,
 				"orderId":          ord.ID,
 				"userId":           ord.CustomerID,
 				"shopId":           ord.ShopID,
+				"shop_name":        shopName, // ✅ ใส่ชื่อร้าน
 				"status":           ord.Status,
 				"total":            ord.Total,
 				"createdAt":        ord.CreatedAt, // เก็บของเดิม
 				"updatedAt":        ord.UpdatedAt, // เวลาที่อัปเดตล่าสุด
-				"movedToHistoryAt": now(),         // เวลาที่ย้ายเข้า history
+				"movedToHistoryAt": now(),         // เวลาเข้า history
+				"items":            items,         // แนบรายการเมนู
+				"item_count":       len(items),    // (ออปชัน) สำหรับสรุปเร็ว ๆ
 			}
 
-			// เขียนเข้า history และลบจาก orders ภายใต้ transaction เดียวกัน
-			if err := tx.Set(historyRef, payload, firestore.MergeAll); err != nil {
-				return fiber.NewError(http.StatusInternalServerError, "failed to move to history: "+err.Error())
+			if err := tx.Set(shopHistoryRef, payload, firestore.MergeAll); err != nil {
+				return fiber.NewError(500, "failed to write shop history: "+err.Error())
+			}
+			if err := tx.Set(userHistoryRef, payload, firestore.MergeAll); err != nil {
+				return fiber.NewError(500, "failed to write user history: "+err.Error())
 			}
 			if err := tx.Delete(ref); err != nil {
-				return fiber.NewError(http.StatusInternalServerError, "failed to delete original order: "+err.Error())
+				return fiber.NewError(500, "failed to delete original order: "+err.Error())
 			}
 
-			// เซ็ตผลลัพธ์ไว้ส่งคืน
 			out = ord
 			return nil
 		}
 
-		// กรณีไม่ใช่ completed → อัปเดตสถานะในเอกสารเดิมเฉย ๆ
+		// 6) ไม่ใช่ completed → อัปเดตสถานะใน orders
 		if err := tx.Update(ref, []firestore.Update{
 			{Path: "status", Value: newStatus},
 			{Path: "updatedAt", Value: ord.UpdatedAt},
 		}); err != nil {
-			return fiber.NewError(http.StatusInternalServerError, "failed to update: "+err.Error())
+			return fiber.NewError(500, "failed to update: "+err.Error())
 		}
 
 		out = ord
@@ -258,15 +372,15 @@ func UpdateOrderStatus(c *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		// แปลง error ที่มาจาก transaction ให้เป็น HTTP ตามที่โยนไว้
 		if fe, ok := err.(*fiber.Error); ok {
 			return c.Status(fe.Code).JSON(fiber.Map{"error": fe.Message})
 		}
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.JSON(fiber.Map{"order": out})
 }
+
 func ListHistoryByShop(c *fiber.Ctx) error {
 	shopId := c.Params("shopId")
 	if shopId == "" {
