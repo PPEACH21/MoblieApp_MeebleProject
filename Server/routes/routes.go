@@ -9,6 +9,7 @@ import (
 
 func Routes(app *fiber.App) {
 	app.Get("/profile", middlewares.Profile)
+	app.Put("/profile/:id",controllers.UpdateProfile)
 	app.Post("/sendotp", service.OTPvertify())
 	app.Put("/verifiedEmail/:id", controllers.VerifiedUser)
 

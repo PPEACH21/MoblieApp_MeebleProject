@@ -2,7 +2,7 @@
 import { api } from "../../api/axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loginFailed,loginSuccess,resetAuth, registerSuccess,registerFailed ,loadingProcess} from "../slices/authSlice";
-
+import { getProfile } from "./profileAction";
 export const loginUser = (credentials) => async (dispatch) => {
   try {
     dispatch(resetAuth());
@@ -10,7 +10,7 @@ export const loginUser = (credentials) => async (dispatch) => {
 
     const res = await api.post(`/login`, credentials);
     await AsyncStorage.setItem("access_token", res.data.token);
-
+    dispatch(getProfile())
     dispatch(loginSuccess(res.data));
   } catch (err) {
     const message = err.response?.data?.message || "เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูล";
