@@ -608,3 +608,66 @@ func UpdateCartQty(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"message": "ok"})
 }
+
+
+func UpdateProfile(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	var newdata models.User
+	if err := c.BodyParser(&newdata); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("cannot parse JSON")
+	}
+
+	docRef := config.User.Doc(userID)
+	docSnap, err := docRef.Get(config.Ctx)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "user not found",
+		})
+	}
+
+	var dbuser models.User
+	if err := docSnap.DataTo(&dbuser); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to parse existing data",
+		})
+	}
+
+	updateData := make(map[string]interface{})
+	if newdata.Firstname != "" && newdata.Firstname != dbuser.Firstname {
+		updateData["firstname"] = newdata.Firstname
+	}
+	if newdata.Lastname != "" && newdata.Lastname != dbuser.Lastname {
+		updateData["lastname"] = newdata.Lastname
+	}
+	if newdata.Avatar != "" && newdata.Avatar != dbuser.Avatar {
+		updateData["avatar"] = newdata.Avatar
+	}
+
+	if len(updateData) == 0 {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": "no changes detected",
+			"user":    dbuser,
+		})
+	}
+
+	_, err = docRef.Set(config.Ctx, updateData, firestore.MergeAll)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update user",
+		})
+	}
+
+	for key, val := range updateData {
+		switch key {
+		case "Firstname":
+			dbuser.Firstname = val.(string)
+		case "Lastname":
+			dbuser.Lastname = val.(string)
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "profile updated successfully",
+		"user":    dbuser,
+	})
+}

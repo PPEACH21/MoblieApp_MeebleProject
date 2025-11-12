@@ -30,3 +30,12 @@ export const TextInputSplash = ({name,setvalue,value,type})=>{
         </View>
     )
 }
+
+export const TextInputSetting = ({width,name,setvalue,value,type})=>{ 
+    return(
+        <View style={{gap:5, width:width}}>
+            <Text style={[TEXTinput.text01,{alignSelf:'flex-start', fontSize:13}]}>{name}</Text>
+            <TextInput style={[TEXTinput.Input1,{backgroundColor:c.fullwhite,width:'100%' ,borderWidth:2 ,fontSize:13}]} placeholder={name} value={value||""} secureTextEntry={type==="password"?true:false} type={type} onChangeText={(text)=>setvalue(text)}/>
+        </View>
+    )
+}

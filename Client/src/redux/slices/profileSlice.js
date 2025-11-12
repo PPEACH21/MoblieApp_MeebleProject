@@ -10,12 +10,19 @@ const initialState = {
   loading:false,
 };
 
+
 const profileSlice = createSlice({
   name: "profile",
   initialState,
   reducers: {
     profileLoading : (state) => {
         state.loading = true;
+    },
+    updateProfile:(state,action)=>{
+        state.loading=false;
+        state.firstname=action.payload.firstname;
+        state.lastname=action.payload.lastname;
+        state.avatar=action.payload.avatar;
     },
     getProfileSuccess:(state,action)=>{
         state.loading=false;
@@ -32,5 +39,5 @@ const profileSlice = createSlice({
   },
 });
 
-export const { profileLoading, getProfileSuccess, getProfileFailed} = profileSlice.actions;
+export const { profileLoading,updateProfile, getProfileSuccess, getProfileFailed} = profileSlice.actions;
 export default profileSlice.reducer;

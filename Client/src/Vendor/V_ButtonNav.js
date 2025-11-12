@@ -18,8 +18,6 @@ import Animated, { useSharedValue, withTiming, useAnimatedStyle, Easing ,withSeq
 const Tab = createBottomTabNavigator();
 
 const TabStyle =({ state, descriptors, navigation }) => {
-
-
   const translateY = useSharedValue(300); 
   React.useEffect(() => {
     translateY.value = withTiming(0, { duration: 2000, easing: Easing.out(Easing.exp) });
