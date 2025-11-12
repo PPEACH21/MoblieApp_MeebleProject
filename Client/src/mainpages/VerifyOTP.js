@@ -8,6 +8,7 @@ import { BaseColor as c } from "../components/Color";
 import { api } from "../api/axios";
 import Loading from "./Loading";
 import { TextInputSplash } from "../components/TextInput";
+import { m } from "../paraglide/messages";
 
 const VerifyOTP = ({ navigation}) => {
  const dispatch = useDispatch();
@@ -122,21 +123,21 @@ const VerifyOTP = ({ navigation}) => {
         setState(2);
       }
       }catch(err){
-        errmsg("OTP not correct")
+        setErrmsg(m.OTPnotcorrect())
         console.log("OTP not correct")
       }
 
     } else {
-      alert("กรุณากรอกรหัสให้ครบ 6 หลัก");
+      alert(m.mustOTP());
     }
   };
 
   const SubmitPassword=async()=>{
       try{
           if(newPassword.length<8 || conNewPassword.length<8)
-              return setErrmsg("password must have 8")
+              return setErrmsg(m.password_min_length())
           if(conNewPassword!=newPassword){
-              return setErrmsg("Password Notmatch")
+              return setErrmsg(m.password_not_match())
           }
 
           setErrmsg("")            
@@ -145,7 +146,7 @@ const VerifyOTP = ({ navigation}) => {
           navigation.replace("Splash")
       }catch(err){
           console.log("Email not Correct",err)
-          setErrmsg("Email not Correct");
+          setErrmsg(m.error_occurred());
       }
   }
 
@@ -155,40 +156,39 @@ const VerifyOTP = ({ navigation}) => {
       
       <View>
         {state===0&&(
-          <View>
-            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >กรอกEmail</Text>
-            <Text style={{fontSize:20}} >Plese Enter your Email</Text>
+          <View style={{gap:10,justifyContent:'center'}}>
+            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >{m.forgot_password()}</Text>
+            <Text style={{fontSize:20,textAlign:'center'}} >{m.enter_email()}</Text>
           </View>
         )}
         {state===1&&(
           <View>
-            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >กรอกรหัส OTP</Text>
-            <Text style={{fontSize:20}} >Plese Enter your OTP</Text>
+            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >{m.EnterOTP()}</Text>
           </View>
         )}
         {state===2&&(
           <View>
-            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >กรอกรหัสใหม่</Text>
-            <Text style={{fontSize:20}} >Plese Enter your NewPassword</Text>
+            <Text style={{fontSize:25,fontWeight:'bold',textAlign:'center'}} >{m.changePassword()}</Text>
+            <Text style={{fontSize:20}} >{m.RenewPassword()}</Text>
           </View>
         )}
       </View>
 
       {state===0&&(
         <View style={{width:'80%', gap:20}}>
-          <TextInputSplash name="Email" value={email} setvalue={setEmail} type={"email"}/>
+          <TextInputSplash name={m.email()} value={email} setvalue={setEmail} type={"email"}/>
           <TouchableOpacity
             style={[Btn.Btn1,{paddingHorizontal:40}]} 
             onPress={()=>{setState(1),sendmessage()}}
           >
-            <Text style={[Btn.textBtn1]}>ยืนยันEmail</Text>
+            <Text style={[Btn.textBtn1]}>{m.VerifyEmail()}</Text>
           </TouchableOpacity>
         </View>
       )} 
       
       {state===1&&(
-        <View>
-          <View style={[Layout.rowset,{width:'100%',justifyContent:'center'}]} >
+        <View style={{justifyContent:'center',gap:10}} >
+          <View style={[Layout.rowset,{width:'100%'}]} >
             {otp.map((digit, index) => (
               <TextInput
                 key={index}
@@ -198,38 +198,38 @@ const VerifyOTP = ({ navigation}) => {
                 onKeyPress={(e) => handleKeyPress(e, index)}
                 keyboardType="number-pad"
                 maxLength={1}
-                style={[Btn.Btn2,{paddingVertical:20,color:c.S1,fontSize:20, paddingHorizontal:0, width:45,height:75, textAlign:'center',fontWeight:'bold'}]}
+                style={[Btn.Btn2,{paddingVertical:20,color:c.S1,fontSize:20, paddingHorizontal:0, width:45,height:75,textAlign:'center',fontWeight:'bold'}]}
               />
             ))}
           </View>
           <TouchableOpacity
-            style={[{paddingHorizontal:40, alignSelf:'flex-end'}]} 
+            style={[{ alignSelf:'flex-end'}]} 
             onPress={sendmessage}
             disabled={otpCooldown > 0}
           >
-            <Text style={{textAlign:'right'}}>{otpCooldown > 0 ? `ส่งใหม่อีก ${otpCooldown} วินาที` : "ส่ง OTP ใหม่"}</Text>
+            <Text style={{textAlign:'right'}}>{otpCooldown > 0 ? `${m.SendOTP()} ${otpCooldown} ${m.second()}` : m.resendOTP()}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[Btn.Btn1,{paddingHorizontal:40}]} 
             onPress={handleVerify}
           >
             {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
-            <Text style={[Btn.textBtn1]}>ยืนยันรหัส</Text>
+            <Text style={[Btn.textBtn1]}>{m.confirm()}</Text>
           </TouchableOpacity>
         </View>
       )} 
 
        {state===2&&(
         <View style={{width:'80%', gap:20}}>
-          <TextInputSplash name="new password" value={newPassword} setvalue={setNewpassword} type={"password"}/>
-          <TextInputSplash name="Confirm new password" value={conNewPassword} setvalue={setconNewPassword} type={"password"}/>
+          <TextInputSplash name={m.enter_password()} value={newPassword} setvalue={setNewpassword} type={"password"}/>
+          <TextInputSplash name={m.confrimpassword()} value={conNewPassword} setvalue={setconNewPassword} type={"password"}/>
           
           {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
           <TouchableOpacity
             style={[Btn.Btn1,{paddingHorizontal:40}]} 
             onPress={SubmitPassword}
           >
-            <Text style={[Btn.textBtn1]}>ยืนยัน</Text>
+            <Text style={[Btn.textBtn1]}>{m.confirm()}</Text>
           </TouchableOpacity>
         </View>
       )} 

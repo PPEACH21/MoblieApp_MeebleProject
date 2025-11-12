@@ -15,7 +15,7 @@ export const Btn = StyleSheet.create({
     textBtn1:{
         color:c.fullwhite,
         fontWeight:"bold",
-        fontSize:20,
+        fontSize:16,
         textAlign:'center'
     },
     Btn2:{
@@ -29,7 +29,7 @@ export const Btn = StyleSheet.create({
     textBtn2:{
         color:c.S2,
         fontWeight:"bold",
-        fontSize:20,
+        fontSize:16,
         textAlign:'center'
     },
     

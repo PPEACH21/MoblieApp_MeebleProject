@@ -272,7 +272,7 @@ const Splash = ({ navigation }) => {
     const SubmitLogin=async()=>{
         setErrmsg("")
         if(logininput.Username==="" || logininput.Password===""){
-            return setErrmsg("your must fill information")
+            return setErrmsg(m.IncompleteInfo())
         }
         Dispath(loginUser({
             username:logininput.Username,
@@ -283,17 +283,17 @@ const Splash = ({ navigation }) => {
     const SubmitRegister=()=>{
         setErrmsg("")
         if(registerinput.Email==="" || registerinput.Username==="" ||  registerinput.Password==="" || registerinput.ConfirmPassword===""){
-            return setErrmsg("your must fill information")
+            return setErrmsg(m.IncompleteInfo())
         }
         
         if(registerinput.Password != registerinput.ConfirmPassword){
-            return setErrmsg("Password Not Match")
+            return setErrmsg(m.password_not_match())
         }
         if(registerinput.Username.length<5){
-            return setErrmsg("User must be than 5 character")
+            return setErrmsg(m.username_min_length())
         }
         if(registerinput.Password.length<8 && registerinput.Password.length<8){
-            return setErrmsg("password must be than 8")
+            return setErrmsg(m.password_min_length())
         }
 
         Dispath(registerID({
@@ -390,7 +390,7 @@ const Splash = ({ navigation }) => {
                     ]}
                 />
                 <TouchableOpacity onPress={toggleLanguage} style={[Btn.Btn2,{alignSelf:'flex-end',marginTop:20}]}>
-                    <Text style={{fontSize:10}}>Language</Text>
+                    <Text style={{fontSize:10}}>{m.Language()}</Text>
                 </TouchableOpacity>
                 <View style={[{ flex: 1, justifyContent: "center" ,marginTop:-50}]}>
                     <Text
@@ -403,8 +403,8 @@ const Splash = ({ navigation }) => {
                     >
                         MEEBLE
                     </Text>
-                    <Text style={{ fontSize: 16, color: c.fullwhite, fontWeight: "bold" }}>
-                        แอพสั่งอาหารสำหรับคุณ
+                    <Text style={{ width:250,fontSize: 16, color: c.fullwhite, fontWeight: "bold" }}>
+                        {m.project_description01()}
                     </Text>
                 </View>
 
@@ -416,7 +416,7 @@ const Splash = ({ navigation }) => {
                                 setIsToggled(true),
                                 setlogin(false) 
                             }} style={[Btn.Btn2, { width: "45%" }]}>
-                                <Text style={Btn.textBtn2}>Register</Text>
+                                <Text style={Btn.textBtn2}>{m.register_s()}</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -435,7 +435,7 @@ const Splash = ({ navigation }) => {
             </Animated.View>
 
             <Animated.View style={[{ position: "absolute", top: 100 }, LoginTriggerHead]}>
-                <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>LOGIN</Text>
+                <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>{m.LOGIN()}</Text>
             </Animated.View>
             <Animated.View style={[{ position: "absolute", top: 100, width:"100%", alignItems:'center'}, RegisterTriggerHead]}>
                 {!chooseRole?
@@ -443,13 +443,13 @@ const Splash = ({ navigation }) => {
                     key="chooseRole"
                     exiting={FadeOut}
                 >
-                    <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>Choose Role</Text>
+                    <Text style={{ fontSize: 50, fontWeight: 'bold', color: c.fullwhite }}>{m.choose_role()}</Text>
                 </Animated.View>
                 :
                 <Animated.View
                     entering={FadeIn}
                 >
-                    <Text style={{ fontSize: 60, fontWeight: 'bold', color: c.fullwhite }}>REGISTER</Text>
+                    <Text style={{ fontSize: 55, fontWeight: 'bold', color: c.fullwhite }}>{m.REGISTER()}</Text>
                 </Animated.View>
                 }
             </Animated.View>
@@ -470,25 +470,25 @@ const Splash = ({ navigation }) => {
 
             <Animated.View style={[{ position: "absolute", width: '80%', gap: 20}, LoginTrigger]}>
                
-                    <TextInputSplash name={"Username"} type={"text"} setvalue={(text) => setLogininput({ ...logininput, Username: text })} value={logininput.Username} />
-                    <TextInputSplash name={"Password"} type={"password"} setvalue={(text) => setLogininput({ ...logininput, Password: text })} value={logininput.Password} />
+                    <TextInputSplash name={m.username()} type={"text"} setvalue={(text) => setLogininput({ ...logininput, Username: text })} value={logininput.Username} />
+                    <TextInputSplash name={m.password()} type={"password"} setvalue={(text) => setLogininput({ ...logininput, Password: text })} value={logininput.Password} />
 
                     <TouchableOpacity
                         onPress={()=>{navigation.navigate("verifyotp")}}
                     >
-                        <Text style={{ alignSelf: 'flex-end' ,color:c.blue}}>ForgotPassword</Text>
+                        <Text style={{ alignSelf: 'flex-end' ,color:c.blue}}>{m.forgot_password()}</Text>
                     </TouchableOpacity>
                     {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
                     <TouchableOpacity
                         style={[Btn.Btn1, { width:'100%'}]}
                         onPress={SubmitLogin}
                     >
-                        <Text style={{ textAlign: 'center' }}>SignIn</Text>
+                        <Text style={[Btn.textBtn1,{ textAlign: 'center'}]}>{m.Signin()}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={()=>{setlogin(false),setChooseRole(false),setRegister(true)}}
                     >
-                        <Text style={{color:c.blue, textAlign: 'center' }}>You dont have user</Text>
+                        <Text style={{color:c.blue, textAlign: 'center' }}>{m.dont_have_account()}</Text>
                     </TouchableOpacity>
 
             </Animated.View>
@@ -503,14 +503,14 @@ const Splash = ({ navigation }) => {
                                     style={[Btn.Btn1,Layout.centerset ,{ width: 200,height:200 }]}
                                     onPress={()=>{setRolesetup("user");setChooseRole(true)}}
                                 >  
-                                    <Text style={[{ textAlign: 'center' ,justifyContent:'center'},Btn.textBtn1]}>USER</Text>
+                                    <Text style={[{ textAlign: 'center' ,justifyContent:'center'},Btn.textBtn1]}>{m.costumer().toUpperCase()}</Text>
                                     <FontAwesome5 name="users" size={70} color={c.fullwhite}/>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[Btn.Btn1, Layout.centerset,{ width: 200,height:200 }]}
                                     onPress={()=>{setRolesetup("vendor");setChooseRole(true)}}
                                 >
-                                    <Text style={[{ textAlign: 'center',justifyContent:'center'},Btn.textBtn1]}>VENDOR</Text>
+                                    <Text style={[{ textAlign: 'center',justifyContent:'center'},Btn.textBtn1]}>{m.vendor().toUpperCase()}</Text>
                                     <FontAwesome6 name="shop" size={70} color={c.fullwhite}/>
                                 </TouchableOpacity>
                             </View>
@@ -524,21 +524,21 @@ const Splash = ({ navigation }) => {
                                 
                         ]}
                     >
-                        <TextInputSplash name={"Email"} type={"email"} setvalue={(text) => setRegisterinput({ ...registerinput, Email: text })} value={registerinput.Email} />
-                        <TextInputSplash name={"Username"} type={"text"} setvalue={(text) => setRegisterinput({ ...registerinput, Username: text })} value={registerinput.Username} />
-                        <TextInputSplash name={"Password"} type={"password"} setvalue={(text) => setRegisterinput({ ...registerinput, Password: text })} value={registerinput.Password} />
-                        <TextInputSplash name={"ConfrimPassword"} type={"password"} setvalue={(text) => setRegisterinput({ ...registerinput, ConfirmPassword: text })} value={registerinput.ConfirmPassword} />
+                        <TextInputSplash name={m.email()} type={"email"} setvalue={(text) => setRegisterinput({ ...registerinput, Email: text })} value={registerinput.Email} />
+                        <TextInputSplash name={m.username()} type={"text"} setvalue={(text) => setRegisterinput({ ...registerinput, Username: text })} value={registerinput.Username} />
+                        <TextInputSplash name={m.password()} type={"password"} setvalue={(text) => setRegisterinput({ ...registerinput, Password: text })} value={registerinput.Password} />
+                        <TextInputSplash name={m.confrimpassword()} type={"password"} setvalue={(text) => setRegisterinput({ ...registerinput, ConfirmPassword: text })} value={registerinput.ConfirmPassword} />
                         {errmsg!=''&&(<Text style={[{ textAlign: 'center',color:c.red,fontWeight:'bold' }]}>{errmsg}</Text>)}
                         <TouchableOpacity
                             style={[Btn.Btn1, { width: '100%' }]}
                             onPress={SubmitRegister}
                         >
-                            <Text style={[{ textAlign: 'center'},Btn.textBtn1]}>Signup</Text>
+                            <Text style={[{ textAlign: 'center'},Btn.textBtn1]}>{m.Signup()}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={()=>{setRegister(false),setlogin(true)}}
                         >   
-                            <Text style={{fontWeight:"bold",color:c.blue}}>You have user</Text>
+                            <Text style={{fontWeight:"bold",color:c.blue}}>{m.have_account()}</Text>
                         </TouchableOpacity>
                     </Animated.View>
                     }
