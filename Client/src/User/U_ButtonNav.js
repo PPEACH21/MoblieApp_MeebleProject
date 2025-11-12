@@ -1,11 +1,11 @@
 // src/User/UserTabs.jsx
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
+
 import { Text,View,Dimensions,TouchableOpacity} from "react-native";
 import { useEffect } from "react";
 import { Layout } from "../components/Layout";
 import { BaseColor as c } from "../components/Color";
-// ✅ import หน้าหลักของ user
 import U_Home from "./pages/U_Home";
 import UserOrderScreen from "./pages/UserOrder";
 import UserReserveScreen from "./pages/UserReservation";
@@ -62,7 +62,7 @@ const TabStyle =({ state, descriptors, navigation }) => {
     },animatedStyle
     ]}>
 
-      <Animated.View style={[{position:'absolute',left:0,width:80,height:75,borderRadius:60,backgroundColor:c.S1},indicatorStyle]}/>
+      <Animated.View style={[{position:'absolute',left:0,width:80,height:80,borderRadius:60,backgroundColor:c.S1},indicatorStyle]}/>
 
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];

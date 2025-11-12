@@ -1,5 +1,6 @@
 import { View, Text, Pressable,Modal, ScrollView, Image, TouchableOpacity} from "react-native";
 import { useState } from "react";
+import CountryFlag from "react-native-country-flag";
 import {getLocale,setLocale} from "../../paraglide/runtime"
 import {Layout} from "../../components/Layout"
 import { useDispatch,useSelector } from "react-redux";
@@ -10,6 +11,7 @@ import {TextInputSetting} from "../../components/TextInput"
 import { TEXTinput } from "../../components/TextInput";
 import * as ImagePicker from "expo-image-picker";
 import { UpdateProfile } from "../../redux/actions/profileAction";
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 export default function UserSettingScreen({navigation}) {
   const [language, setLaguage] = useState(getLocale());
@@ -79,7 +81,7 @@ export default function UserSettingScreen({navigation}) {
     <View style={[Layout.container]}>
       <ScrollView>
         <View style={{ flex: 1, padding: 20, gap:10 }}>
-          <Text style={{ fontSize: 20, fontWeight: "bold", marginTop: 15 }}>ตั้งค่าผู้ใช้</Text>
+          <Text style={{ fontSize: 20, fontWeight: "bold", marginTop: 15 }}>ตั้งค่า</Text>
           <View style={{gap:10, padding:20,backgroundColor:c.white ,borderRadius:20,shadowRadius:20,shadowColor:c.black,shadowOpacity: 0.06 ,shadowOffset:{ width: 3, height: 40 },elevation: 7}}>
             <Image source={{uri:Profile.avatar||""}}  width={200} height={200} style={{alignSelf:'center',backgroundColor:c.whitegary, borderRadius:200}} >
               
@@ -91,22 +93,24 @@ export default function UserSettingScreen({navigation}) {
               </View>
           </View>
 
-          <View style={{gap:10}}>
-            <Pressable onPress={()=>{console.log(Profile)}} style={{ padding: 10, backgroundColor: "#e2e8f0", borderRadius: 8 }}>
-              <Text>CHECK</Text>
-            </Pressable>
-            <Pressable onPress={()=>{setName({Firstname:Profile.firstname,Lastname:Profile.lastname});setOpenEditProfile(true)}} style={{ padding: 10, backgroundColor: "#e2e8f0", borderRadius: 8 }}>
-              <Text>ตั้งค่าผู้ใช้</Text>
-            </Pressable>
-            <Pressable onPress={toggleLanguage} style={{ padding: 10, backgroundColor: "#e2e8f0", borderRadius: 8 }}>
-              <Text>language</Text>
-            </Pressable>
-            <Pressable onPress={()=>{Dispatch(resetAuth());navigation.replace("Splash")}} style={{ padding: 10, backgroundColor: "#e2e8f0", borderRadius: 8 }}>
-              <Text>ออกจากระบบ</Text>
-            </Pressable>
+          <View style={{gap:10 }}>
+            <TouchableOpacity onPress={()=>{setName({Firstname:Profile.firstname,Lastname:Profile.lastname});setOpenEditProfile(true)}} style={{flexDirection:'row', justifyContent:'space-between',padding: 15,backgroundColor:c.white ,borderRadius:20,shadowRadius:20,shadowColor:c.black,shadowOpacity: 0.06 ,shadowOffset:{ width: 3, height: 40 },elevation: 7}}>
+              <Text style={{fontSize:16,fontWeight:'bold'}}>ตั้งค่าผู้ใช้</Text>
+              <MaterialIcons name="navigate-next" size={24} color="black" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleLanguage} style={{ flexDirection:'row', justifyContent:'space-between',padding: 15,backgroundColor:c.white ,borderRadius:20,shadowRadius:20,shadowColor:c.black,shadowOpacity: 0.06 ,shadowOffset:{ width: 3, height: 40 },elevation: 7}}>
+              <Text style={{fontSize:16,fontWeight:'bold'}}>language</Text>
+              <CountryFlag style={{borderRadius:5}} isoCode={language.toUpperCase()==="EN"?"US":language.toUpperCase()} size={25} />
+              {/* <MaterialIcons name="navigate-next" size={24} color="black" /> */}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={()=>{Dispatch(resetAuth());navigation.replace("Splash")}} style={{ padding: 15,backgroundColor:c.white ,borderRadius:20,shadowRadius:20,shadowColor:c.black,shadowOpacity: 0.06 ,shadowOffset:{ width: 3, height: 40 },elevation: 7}}>
+              <Text style={{fontSize:16, color:c.red,fontWeight:'bold',textAlign:'center'}}>ออกจากระบบ</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
+
+
 
       <Modal
         transparent
