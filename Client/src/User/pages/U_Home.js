@@ -14,18 +14,22 @@ import {
   Pressable,
   TextInput,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseColor as c } from "../../components/Color";
 import { api } from "../../api/axios";
+import { useSelector } from "react-redux";
 
 const CHIP_H = 34;
 
 const U_Home = () => {
   const navigation = useNavigation();
+  const Auth = useSelector((s) => s.auth);
+
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
   // 🔎 ค้นหา + ท็อกเกิล
   const [query, setQuery] = useState("");
@@ -33,6 +37,21 @@ const U_Home = () => {
   const [onlyReservable, setOnlyReservable] = useState(false);
   const [type, setType] = useState("all");
   const [typePickerVisible, setTypePickerVisible] = useState(false);
+
+  const getCustomerId = () => {
+    const u = Auth?.user;
+    if (!u) return "";
+    if (typeof u === "string") return u.trim();
+    return (
+      u.uid ||
+      u.id ||
+      u.user_id ||
+      u.username ||
+      u.phone ||
+      u.email ||
+      ""
+    )?.toString().trim();
+  };
 
   const fetchShops = useCallback(async () => {
     try {
@@ -46,13 +65,38 @@ const U_Home = () => {
     }
   }, []);
 
+  // 🛒 นับจำนวนสินค้าในตะกร้า
+  const fetchCartSummary = useCallback(async () => {
+    try {
+      const customerId = getCustomerId();
+      if (!customerId) {
+        setCartCount(0);
+        return;
+      }
+      const res = await api.get("/cart", { params: { customerId } });
+      const items = res?.data?.items || [];
+      const count = items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+      setCartCount(count);
+    } catch {
+      setCartCount(0);
+    }
+  }, [Auth]);
+
   useEffect(() => {
     fetchShops();
   }, [fetchShops]);
 
+  // อัปเดต badge ตะกร้าทุกครั้งที่โฟกัส
+  useFocusEffect(
+    useCallback(() => {
+      fetchCartSummary();
+    }, [fetchCartSummary])
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchShops();
+    await fetchCartSummary();
     setRefreshing(false);
   };
 
@@ -67,14 +111,12 @@ const U_Home = () => {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (shops || []).filter((it) => {
-      // ✅ แปลง status ให้เป็น boolean
       const rawStatus = (it.status ?? "").toString().toLowerCase();
       const isOpen =
         rawStatus === "open" ||
         rawStatus === "active" ||
         rawStatus === "true" ||
         rawStatus === "1";
-      const status = (it.status || false);
       const reservable = !!it.reserve_active;
 
       if (q) {
@@ -87,7 +129,6 @@ const U_Home = () => {
       if (onlyReservable && !reservable) return false;
       if (type !== "all" && String(it.type) !== type) return false;
 
-      // ✅ คืนค่าใหม่ให้ FlatList ใช้ต่อได้สะดวก
       it.isOpen = isOpen;
       return true;
     });
@@ -96,7 +137,6 @@ const U_Home = () => {
   // การ์ด
   const renderShop = ({ item }) => {
     const isOpen = item.isOpen === true;
-    const s = (item.status || false);
     const isClosed = !isOpen;
 
     return (
@@ -207,7 +247,7 @@ const U_Home = () => {
         )}
       </View>
 
-      {/* 🔘 Toggles */}
+      {/* 🔘 Toggles (มีไอคอน ✔ / radio) */}
       <View style={styles.togglesRow}>
         {/* เปิดอยู่ */}
         <Pressable
@@ -260,10 +300,10 @@ const U_Home = () => {
           </Text>
         </Pressable>
 
-        {/* เลือกประเภท — ข้อความล้วน */}
+        {/* เลือกประเภท */}
         <Pressable
           onPress={() => setTypePickerVisible(true)}
-          style={[styles.typeSelector, { flex: 1 }]} // ไม่เปลี่ยนสีตามที่ขอ
+          style={[styles.typeSelector, { flex: 1 }]}
           android_ripple={{ color: "#00000011" }}
         >
           <Ionicons
@@ -310,7 +350,7 @@ const U_Home = () => {
         initialNumToRender={8}
       />
 
-      {/* 🔽 Modal เลือกประเภท (แก้ error: มี root เดียว + ทุกข้อความอยู่ใน <Text>) */}
+      {/* 🔽 Modal เลือกประเภท (มี checkmark แสดงตัวที่เลือก) */}
       <Modal
         transparent
         visible={typePickerVisible}
@@ -374,6 +414,16 @@ const U_Home = () => {
           </View>
         </View>
       </Modal>
+
+      {/* 🛒 ปุ่มตะกร้าลอย */}
+      <Pressable onPress={() => navigation.navigate("Cart")} style={styles.cartFab}>
+        <Ionicons name="cart" size={24} color={c.fullwhite} />
+        {cartCount > 0 && (
+          <View style={styles.cartBadge}>
+            <Text style={styles.cartBadgeTxt}>{cartCount}</Text>
+          </View>
+        )}
+      </Pressable>
     </View>
   );
 };
@@ -560,4 +610,38 @@ const styles = StyleSheet.create({
     backgroundColor: c.S2,
   },
   modalCloseTxt: { color: c.fullwhite, fontWeight: "800" },
+
+  /* 🛒 Cart floating button */
+  cartFab: {
+    position: "absolute",
+    bottom: 24,
+    right: 20,
+    backgroundColor: c.S2,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  cartBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "red",
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartBadgeTxt: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
+  },
 });

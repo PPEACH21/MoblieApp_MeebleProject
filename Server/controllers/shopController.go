@@ -1,21 +1,22 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/gofiber/fiber/v2"
-	"google.golang.org/genproto/googleapis/type/latlng"
-
 	"github.com/PPEACH21/MoblieApp_MeebleProject/config"
 	"github.com/PPEACH21/MoblieApp_MeebleProject/models"
 	services "github.com/PPEACH21/MoblieApp_MeebleProject/service"
+	"github.com/gofiber/fiber/v2"
+	"google.golang.org/genproto/googleapis/type/latlng"
 )
 
 /* ---------------- helpers ---------------- */
@@ -620,4 +621,107 @@ func ListAllOrders(c *fiber.Ctx) error {
 		}
 	}
 	return c.JSON(fiber.Map{"orders": orders})
+}
+func ListUserOrders(c *fiber.Ctx) error {
+	ctx := config.Ctx
+
+	userId := strings.TrimSpace(c.Query("userId"))
+	if userId == "" {
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "missing userId",
+		})
+	}
+
+	// ใช้ CustomerID ใน Firestore เป็นตัวกรอง
+	iter := config.Client.
+		Collection("orders").
+		Where("customerId", "==", userId).
+		Documents(ctx)
+
+	docs, err := iter.GetAll()
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list user orders",
+			"msg":   err.Error(),
+		})
+	}
+
+	orders := make([]models.Order, 0, len(docs))
+	for _, d := range docs {
+		var o models.Order
+		if err := d.DataTo(&o); err == nil {
+			o.ID = d.Ref.ID
+			orders = append(orders, o)
+		}
+	}
+
+	// 🔹 เรียงเวลาใหม่สุดขึ้นก่อน
+	sort.Slice(orders, func(i, j int) bool {
+		ti := orders[i].CreatedAt
+		tj := orders[j].CreatedAt
+		return ti.After(tj)
+	})
+
+	// 🔹 map ให้ตรงกับฝั่ง RN ที่ต้องการ
+	type OrderResponse struct {
+		ID        string    `json:"id"`
+		ShopName  string    `json:"shop_name"`
+		Total     float64   `json:"total"`
+		Status    string    `json:"status"`
+		CreatedAt time.Time `json:"createdAt"`
+	}
+
+	out := make([]OrderResponse, 0, len(orders))
+	for _, o := range orders {
+		out = append(out, OrderResponse{
+			ID:        o.ID,
+			ShopName:  o.ShopName,
+			Total:     o.Total,
+			Status:    o.Status,
+			CreatedAt: o.CreatedAt,
+		})
+	}
+
+	return c.JSON(fiber.Map{"orders": out})
+}
+func GetUserHistoryDetail(c *fiber.Ctx) error {
+	uid := c.Params("uid")
+	historyId := c.Params("historyId")
+
+	if uid == "" || historyId == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "uid and historyId required",
+		})
+	}
+
+	docRef := config.Client.Collection("users").Doc(uid).Collection("history").Doc(historyId)
+	snap, err := docRef.Get(context.Background())
+	if err != nil {
+		// ✅ ตรวจ error แบบง่าย ไม่ต้อง import grpc/status
+		if strings.Contains(err.Error(), "NotFound") {
+			return c.Status(http.StatusNotFound).JSON(fiber.Map{
+				"error": "history not found",
+			})
+		}
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	if !snap.Exists() {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "history not found",
+		})
+	}
+
+	var order models.Order
+	if err := snap.DataTo(&order); err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to parse: " + err.Error(),
+		})
+	}
+
+	order.ID = snap.Ref.ID
+
+	return c.JSON(fiber.Map{"order": order})
 }

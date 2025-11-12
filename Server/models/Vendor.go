@@ -41,11 +41,9 @@ type CreateOrderFromMenuRequest struct {
 }
 
 type AddToCartRequest struct {
-	VendorID   string `json:"vendorId"`   // optional
-	Shop_name  string `json:"shop_name"`  // optional
-	ShopID     string `json:"shopId"`     // optional
-	CustomerID string `json:"customerId"` // REQUIRED: username
-	UserID     string `json:"userId"`     // REQUIRED: auth.user_id (doc id)
+	Shop_name  string `json:"shop_name"` // snake_case
+	ShopID     string `json:"shopId"`
+	CustomerID string `json:"customerId"`
 	Qty        int    `json:"qty"`
 	Item       struct {
 		MenuID      string  `json:"menuId"`
@@ -92,7 +90,6 @@ type Cart struct {
 	Total      float64    `json:"total" firestore:"total"`           // ยอดรวมทั้งหมด
 	UpdatedAt  time.Time  `json:"updatedAt" firestore:"updatedAt"`   // เวลาอัปเดตล่าสุด
 }
-
 
 // ----- DTO (request bodies) -----
 
