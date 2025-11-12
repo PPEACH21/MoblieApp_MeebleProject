@@ -1,5 +1,5 @@
 // src/Vendor/HomeShop.jsx
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
+import { BaseColor as c } from "../../components/Color";
 import { api } from "../../api/axios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -23,6 +24,8 @@ import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
 import { BaseColor } from "../../components/Color";
 import { useDispatch, useSelector } from "react-redux";
+import { resetAuth } from "../../redux/slices/authSlice";
+import { getLocale,setLocale } from "../../paraglide/runtime";
 const STATUS_OPEN = "open";
 const STATUS_CLOSED = "closed";
 
@@ -38,7 +41,7 @@ const TYPE_LABEL = {
 
 /* ---------- Base styles ที่ใช้สีจาก BaseColor ---------- */
 const baseStyles = {
-  container: { flex: 1, padding: 16, backgroundColor: "white" },
+  container: { flex: 1, padding: 16, paddingBottom:100,backgroundColor: "white" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 22, fontWeight: "800", color: BaseColor.black },
   error: { color: BaseColor.red, marginTop: 6, textAlign: "center" },
@@ -62,9 +65,10 @@ const baseStyles = {
     elevation: 3,
   },
   row: {
-    paddingVertical: 12,
+    height:60,
+    paddingHorizontal:10,
     borderBottomWidth: 1,
-    borderBottomColor: BaseColor.S3,
+    borderColor: BaseColor.S3,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -291,8 +295,8 @@ async function uploadToImgbb(base64) {
   return json?.data?.display_url || json?.data?.url;
 }
 
-export default function SettingShop() {
-  const Dispath = useDispatch();
+export default function SettingShop({navigation}) {
+  const Dispatch = useDispatch();
   const Auth = useSelector((state) => state.auth);
   const headers = Auth.token
     ? { Authorization: `Bearer ${Auth.token}` }
@@ -319,6 +323,14 @@ export default function SettingShop() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
+  const [language, setLaguage] = useState(getLocale());
+  const toggleLanguage = () => {
+      const newLang = language === "th" ? "en" : "th";
+      console.log(language)
+      setLocale(newLang);
+      setLaguage(newLang);
+  };
+
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const getShopId = useCallback(async () => {
     if (!Auth?.user) return; // รอ auth พร้อมก่อน
@@ -334,7 +346,7 @@ export default function SettingShop() {
   useEffect(() => {
     getShopId();
   }, [getShopId]);
-
+  
   const fetchShop = useCallback(async () => {
     if (!shopId) return; // กันไว้ก่อน
     try {
@@ -532,6 +544,8 @@ export default function SettingShop() {
       setUploadingImage(false);
     }
   };
+  
+  
 
   /* ---------- renders ---------- */
   if (loading) {
@@ -562,6 +576,7 @@ export default function SettingShop() {
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <ScrollView>
       <StatusBar style="dark" />
       <View style={baseStyles.container}>
         {shopImg ? (
@@ -715,7 +730,18 @@ export default function SettingShop() {
             </Text>
           )}
         </View>
+        
+        <Text style={{paddingTop:20, fontSize:20, fontWeight:'bold'}}>ระบบ</Text>
+        <View style={baseStyles.card}>
+          <Pressable style={[baseStyles.row ,{justifyContent:'center'}]} onPress={toggleLanguage}>
+            <Text>เปลี่ยนภาษา</Text>
+          </Pressable>
+          <Pressable style={[baseStyles.row ,{justifyContent:'center'}]} onPress={()=>{Dispatch(resetAuth());navigation.replace("Splash")}}>
+            <Text style={{color:c.red,fontWeight:'bold'}}>ออกจากระบบ</Text>
+          </Pressable>
+        </View>
       </View>
+      </ScrollView>
 
       {/* โมดัลแก้ไขร้าน */}
       <Modal
