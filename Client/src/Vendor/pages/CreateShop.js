@@ -19,7 +19,8 @@ import { api } from "../../api/axios";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "../../Styles/createShopStyle";
-
+import { Btn } from "../../components/Button";
+import { useSelector } from "react-redux";
 /* ---------- constants ---------- */
 const TYPES = ["Appetizer", "Beverage", "Fast food", "Main course", "Dessert"];
 const DEFAULT_COORD = { latitude: 13.7563, longitude: 100.5018 };
@@ -176,6 +177,8 @@ export default function CreateShop({ navigation }) {
   const [results, setResults] = useState([]);
   const searchTimer = useRef(null);
 
+  const Auth = useSelector((state)=>state.auth);
+  
   useEffect(() => {
     (async () => {
       try {
@@ -317,14 +320,15 @@ export default function CreateShop({ navigation }) {
         type,
         image: imageUrl,
         address: { latitude: coord.latitude, longitude: coord.longitude },
-        status: "closed",
+        status: false ,
         order_active: false,
         reserve_active: false,
+        vendor_id:Auth.user
       };
 
       const res = await api.post("/shop/create", payload);
       Alert.alert("สำเร็จ", `สร้างร้านสำเร็จ\nID: ${res?.data?.id || "-"}`);
-      if (navigation?.goBack) navigation.goBack();
+      navigation.replace("HomeVendor")
     } catch (err) {
       const msg =
         err?.response?.data?.error || err?.message || "เกิดข้อผิดพลาด";
@@ -382,8 +386,8 @@ export default function CreateShop({ navigation }) {
               <Text style={styles.muted}>ยังไม่มีรูป</Text>
             </View>
           )}
-          <TouchableOpacity onPress={pickImage} style={styles.button}>
-            <Text style={styles.buttonText}>
+          <TouchableOpacity onPress={pickImage} style={[Btn.Btn1]}>
+            <Text style={[Btn.textBtn1,{fontSize:15}]}>
               {image ? "เปลี่ยนรูป" : "เลือกจากเครื่อง"}
             </Text>
           </TouchableOpacity>
@@ -451,15 +455,9 @@ export default function CreateShop({ navigation }) {
         </View>
 
         {/* Actions */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            onPress={() => navigation?.goBack?.()}
-            style={[styles.button, styles.ghost]}
-          >
-            <Text style={[styles.buttonText, styles.ghostText]}>ยกเลิก</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={submit} style={[styles.button, styles.primary]}>
-            <Text style={styles.buttonText}>สร้างร้าน</Text>
+        <View style={[styles.actions,{justifyContent:'space-evenly'}]}>
+          <TouchableOpacity onPress={submit} style={[Btn.Btn1]}>
+            <Text style={[Btn.textBtn1,{fontSize:16 ,paddingHorizontal:'30%'}]}>สร้างร้าน</Text>
           </TouchableOpacity>
         </View>
 

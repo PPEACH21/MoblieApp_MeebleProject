@@ -61,6 +61,9 @@ func CreateShop(c *fiber.Ctx) error {
 	if in.PriceMin != nil && in.PriceMax != nil && *in.PriceMin > *in.PriceMax {
 		return badRequest(c, "price_min must be <= price_max")
 	}
+	if in.VendorID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "vendor_id is required"})
+	}
 	if in.Status == false {
 		in.Status = true
 	}
@@ -69,7 +72,15 @@ func CreateShop(c *fiber.Ctx) error {
 	in.CreatedAt = now
 	in.UpdatedAt = now
 
+	var vendorRef *firestore.DocumentRef
+	if in.VendorID  != "" {
+		vendorRef = config.Vendor.Doc(in.VendorID )
+	}
+
+	in.VendorRef = vendorRef
 	docRef, _, err := config.Client.Collection("shops").Add(config.Ctx, in)
+
+
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

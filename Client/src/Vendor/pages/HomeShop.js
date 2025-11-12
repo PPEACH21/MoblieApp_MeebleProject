@@ -151,9 +151,10 @@ export default function HomeShop({navigation}) {
       const { data } = await api.get(`/shop/by-id/${Auth.user}`);
       setShopId(data?.id ?? null);
     } catch (e) {
+      navigation.replace("CreateShop");
       console.log("Could not find shop for user", e?.message);
       setShopId(null);
-    }
+    } 
   }, [Auth?.user]); // ไม่ต้องใส่ api ใน deps
 
   useEffect(() => {

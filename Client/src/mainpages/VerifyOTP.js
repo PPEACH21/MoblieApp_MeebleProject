@@ -112,7 +112,7 @@ const VerifyOTP = ({ navigation}) => {
         );
         console.log("Verified success:", updatadata?.data);
         if(Auth.role==="vendor"){
-          navigation.navigate("HomeVendor")
+          navigation.replace("CreateShop")
         }else{
           navigation.navigate("HomeUser")
         }
