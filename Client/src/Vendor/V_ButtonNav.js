@@ -59,8 +59,12 @@ const TabStyle =({ state, descriptors, navigation }) => {
       paddingVertical:20,
       borderRadius:40,
       bottom:15,
+      gap:5,
       shadowColor:c.black,
-      gap:5
+      shadowOpacity: 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 7,
     },animatedStyle
     ]}>
 
@@ -148,7 +152,7 @@ export default function V_ButtonNav({ shopId, initialRouteName = "Home" }) {
       initialRouteName={String(initialRouteName || "Home")}
       tabBar={(props)=><TabStyle {...props}/>}
       screenOptions={{
-        headerShown:false  
+        headerShown:false
       }}
     >
       <Tab.Screen
