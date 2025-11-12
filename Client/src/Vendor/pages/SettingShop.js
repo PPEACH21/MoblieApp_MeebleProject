@@ -1,5 +1,5 @@
 // src/Vendor/HomeShop.jsx
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
+import { BaseColor as c } from "../../components/Color";
 import { api } from "../../api/axios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -23,6 +24,8 @@ import * as FileSystem from "expo-file-system";
 import Constants from "expo-constants";
 import { BaseColor } from "../../components/Color";
 import { useDispatch, useSelector } from "react-redux";
+import { resetAuth } from "../../redux/slices/authSlice";
+import { getLocale,setLocale } from "../../paraglide/runtime";
 const STATUS_OPEN = "open";
 const STATUS_CLOSED = "closed";
 
@@ -38,7 +41,7 @@ const TYPE_LABEL = {
 
 /* ---------- Base styles ที่ใช้สีจาก BaseColor ---------- */
 const baseStyles = {
-  container: { flex: 1, padding: 16, backgroundColor: "white" },
+  container: { flex: 1, padding: 16, paddingBottom:100,backgroundColor: "white" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 22, fontWeight: "800", color: BaseColor.black },
   error: { color: BaseColor.red, marginTop: 6, textAlign: "center" },
@@ -62,9 +65,10 @@ const baseStyles = {
     elevation: 3,
   },
   row: {
-    paddingVertical: 12,
+    height:60,
+    paddingHorizontal:10,
     borderBottomWidth: 1,
-    borderBottomColor: BaseColor.S3,
+    borderColor: BaseColor.S3,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -101,10 +105,11 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 12,
+    paddingHorizontal:10,
     marginBottom: 8,
   },
   primaryBtn: {
-    backgroundColor: BaseColor.S2,
+    backgroundColor: BaseColor.S1,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
@@ -290,8 +295,8 @@ async function uploadToImgbb(base64) {
   return json?.data?.display_url || json?.data?.url;
 }
 
-export default function SettingShop() {
-  const Dispath = useDispatch();
+export default function SettingShop({navigation}) {
+  const Dispatch = useDispatch();
   const Auth = useSelector((state) => state.auth);
   const headers = Auth.token
     ? { Authorization: `Bearer ${Auth.token}` }
@@ -318,29 +323,36 @@ export default function SettingShop() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
-  // ✅ ตัวเปิด/ปิดรายการประเภท
+  const [language, setLaguage] = useState(getLocale());
+  const toggleLanguage = () => {
+      const newLang = language === "th" ? "en" : "th";
+      console.log(language)
+      setLocale(newLang);
+      setLaguage(newLang);
+  };
+
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const getShopId = useCallback(async () => {
-    if (!Auth?.user || !Auth?.token) return; // รอ auth พร้อมก่อน
+    if (!Auth?.user) return; // รอ auth พร้อมก่อน
     try {
-      const response = await api.get(`/shop/by-id/${Auth.user}`, { headers });
+      const response = await api.get(`/shop/by-id/${Auth.user}`);
       setShopId(response?.data?.id ?? null);
     } catch (e) {
       console.log("Could not find shop for user", e?.message);
       setShopId(null);
     }
-  }, [Auth?.user, Auth?.token]); // ไม่ต้องใส่ api ใน deps
+  }, [Auth?.user]); // ไม่ต้องใส่ api ใน deps
 
   useEffect(() => {
     getShopId();
   }, [getShopId]);
-
+  
   const fetchShop = useCallback(async () => {
     if (!shopId) return; // กันไว้ก่อน
     try {
       setLoading(true);
       setErr(null);
-      const res = await api.get(`/shop/${shopId}`, { headers });
+      const res = await api.get(`/shop/${shopId}`);
       const found = res?.data?.shop ?? res?.data ?? null;
       if (!found) {
         setErr({ status: 404, message: "ยังไม่มีร้าน โปรดสร้างร้านก่อน" });
@@ -352,7 +364,7 @@ export default function SettingShop() {
     } finally {
       setLoading(false);
     }
-  }, [shopId, Auth?.token]);
+  }, [shopId]);
 
   useEffect(() => {
     if (!shopId) return;
@@ -367,7 +379,7 @@ export default function SettingShop() {
       });
       setShop((prev) => (prev ? { ...prev, ...patch } : prev));
     },
-    [shop?.ID, shop?.id, shopId, Auth?.token]
+    [shop?.ID, shop?.id, shopId]
   );
 
   const isOpen = (shop?.status || STATUS_OPEN) === STATUS_OPEN;
@@ -532,6 +544,8 @@ export default function SettingShop() {
       setUploadingImage(false);
     }
   };
+  
+  
 
   /* ---------- renders ---------- */
   if (loading) {
@@ -562,6 +576,7 @@ export default function SettingShop() {
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <ScrollView>
       <StatusBar style="dark" />
       <View style={baseStyles.container}>
         {shopImg ? (
@@ -715,7 +730,18 @@ export default function SettingShop() {
             </Text>
           )}
         </View>
+        
+        <Text style={{paddingTop:20, fontSize:20, fontWeight:'bold'}}>ระบบ</Text>
+        <View style={baseStyles.card}>
+          <Pressable style={[baseStyles.row ,{justifyContent:'center'}]} onPress={toggleLanguage}>
+            <Text>เปลี่ยนภาษา</Text>
+          </Pressable>
+          <Pressable style={[baseStyles.row ,{justifyContent:'center'}]} onPress={()=>{Dispatch(resetAuth());navigation.replace("Splash")}}>
+            <Text style={{color:c.red,fontWeight:'bold'}}>ออกจากระบบ</Text>
+          </Pressable>
+        </View>
       </View>
+      </ScrollView>
 
       {/* โมดัลแก้ไขร้าน */}
       <Modal

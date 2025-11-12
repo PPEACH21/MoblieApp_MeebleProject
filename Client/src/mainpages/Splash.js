@@ -389,8 +389,8 @@ const Splash = ({ navigation }) => {
                         },
                     ]}
                 />
-                <TouchableOpacity onPress={toggleLanguage} style={[Btn.Btn2,{alignSelf:'flex-end'}]}>
-                    <Text>Language</Text>
+                <TouchableOpacity onPress={toggleLanguage} style={[Btn.Btn2,{alignSelf:'flex-end',marginTop:20}]}>
+                    <Text style={{fontSize:10}}>Language</Text>
                 </TouchableOpacity>
                 <View style={[{ flex: 1, justifyContent: "center" ,marginTop:-50}]}>
                     <Text

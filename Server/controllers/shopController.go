@@ -61,7 +61,7 @@ func CreateShop(c *fiber.Ctx) error {
 		return badRequest(c, "price_min must be <= price_max")
 	}
 	if in.Status == false {
-		in.Status = false
+		in.Status = true
 	}
 
 	now := time.Now()

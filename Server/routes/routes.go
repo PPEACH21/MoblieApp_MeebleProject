@@ -39,4 +39,9 @@ func Routes(app *fiber.App) {
 	app.Post("/shops/:id/reservations", controllers.CreateReservation)
 	app.Get("/shops/:id/reservations", controllers.ListReservationsByShop)
 	app.Delete("/reservations/:id", controllers.DeleteReservation)
+	/* ---------- CART ---------- */
+	app.Get("/cart", controllers.GetCart)
+	app.Post("/cart/add", controllers.AddToCart)
+	app.Patch("/cart/qty", controllers.UpdateCartQty)
+	app.Post("/cart/checkout", controllers.CheckoutCartFromDB)
 }

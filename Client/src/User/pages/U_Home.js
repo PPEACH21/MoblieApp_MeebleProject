@@ -74,6 +74,7 @@ const U_Home = () => {
         rawStatus === "active" ||
         rawStatus === "true" ||
         rawStatus === "1";
+      const status = (it.status || false);
       const reservable = !!it.reserve_active;
 
       if (q) {
@@ -95,6 +96,7 @@ const U_Home = () => {
   // การ์ด
   const renderShop = ({ item }) => {
     const isOpen = item.isOpen === true;
+    const s = (item.status || false);
     const isClosed = !isOpen;
 
     return (

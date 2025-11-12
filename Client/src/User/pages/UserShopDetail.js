@@ -23,6 +23,7 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { BaseColor as c } from "../../components/Color";
 import { api } from "../../api/axios";
+import { Ionicons } from "@expo/vector-icons";
 
 /* ---------- helpers ---------- */
 const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
@@ -42,24 +43,24 @@ const formatPriceRange = (min, max) => {
 };
 
 const normalizeShop = (raw) => {
-    const s = (raw?.status ?? "").toString().toLowerCase();
-    const isOpen = s === "open" || s === "active" || s === "true" || s === "1";
+  const s = (raw?.status ?? "").toString().toLowerCase();
+  const isOpen = s === "open" || s === "active" || s === "true" || s === "1";
 
-    return {
-      id: raw.id || raw.shop_id || raw.shopId || raw.docId,
-      shop_name: raw.shop_name || raw.name || "ร้านไม่ระบุชื่อ",
-      description: raw.description || "",
-      type: raw.type || "-",
-      status: isOpen,
-      image: raw.image || raw.cover || raw.thumbnail || null,
-      price_min: raw.price_min ?? raw.min_price ?? null,
-      price_max: raw.price_max ?? raw.max_price ?? null,
-      rate: toNum(raw.rate ?? raw.rating ?? 0),
-      order_active: !!(raw.order_active ?? raw.orderActive ?? true),
-      reserve_active: !!(raw.reserve_active ?? raw.reserveActive ?? false),
-      address: raw.address || raw.location || null,
-    };
+  return {
+    id: raw.id || raw.shop_id || raw.shopId || raw.docId,
+    shop_name: raw.shop_name || raw.name || "ร้านไม่ระบุชื่อ",
+    description: raw.description || "",
+    type: raw.type || "-",
+    status: isOpen,
+    image: raw.image || raw.cover || raw.thumbnail || null,
+    price_min: raw.price_min ?? raw.min_price ?? null,
+    price_max: raw.price_max ?? raw.max_price ?? null,
+    rate: toNum(raw.rate ?? raw.rating ?? 0),
+    order_active: !!(raw.order_active ?? raw.orderActive ?? true),
+    reserve_active: !!(raw.reserve_active ?? raw.reserveActive ?? false),
+    address: raw.address || raw.location || null,
   };
+};
 
 const normalizeMenuItem = (raw) => ({
   id: raw.id || raw.menu_id || raw.menuId || raw.docId,
@@ -84,7 +85,7 @@ export default function UserShopDetail() {
   const route = useRoute();
   const initShop = route.params?.shop || null;
   const shopId = route.params?.shopId || initShop?.id;
-
+  const [cartCount, setCartCount] = useState(0);
   const [shop, setShop] = useState(initShop ? normalizeShop(initShop) : null);
   const [loading, setLoading] = useState(!initShop);
   const [err, setErr] = useState(null);
@@ -169,6 +170,7 @@ export default function UserShopDetail() {
   const handleConfirmQty = () => {
     const n = Math.max(1, parseInt(qty, 10) || 1);
     setQtyModalVisible(false);
+    setCartCount((prev) => prev + n);
     Alert.alert(
       "เพิ่มลงตะกร้า",
       `${selectedMenu?.name} × ${n}\nราคารวม: ${fmtTHB(
@@ -176,7 +178,7 @@ export default function UserShopDetail() {
       )}`
     );
   };
-  
+
   const statusBadge = useMemo(() => {
     let bg = "#e5e7eb";
     let tx = c.black;
@@ -341,6 +343,18 @@ export default function UserShopDetail() {
           </View>
         </View>
       </Modal>
+      {/* 🛒 Floating Cart Button */}
+      {cartCount > 0 && (
+        <Pressable
+          onPress={() => nav.navigate("Cart")} // ไปหน้า Cart
+          style={styles.cartFab}
+        >
+          <Ionicons name="cart" size={24} color={c.fullwhite} />
+          <View style={styles.cartBadge}>
+            <Text style={styles.cartBadgeTxt}>{cartCount}</Text>
+          </View>
+        </Pressable>
+      )}
     </>
   );
 }
@@ -458,4 +472,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalBtnTxt: { fontWeight: "800" },
+  cartFab: {
+    position: "absolute",
+    bottom: 24,
+    right: 20,
+    backgroundColor: c.S2,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  cartBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "red",
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartBadgeTxt: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
+  },
 });
