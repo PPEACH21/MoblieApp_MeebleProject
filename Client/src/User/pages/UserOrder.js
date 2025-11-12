@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, ActivityIndicator } from "react-native";
-import { api } from "./../../axios";
+import { api } from "../../api/axios";
 
 export default function UserOrderScreen() {
   const [orders, setOrders] = useState([]);

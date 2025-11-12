@@ -1,13 +1,23 @@
 // src/User/pages/U_Home.jsx
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
-  View, Text, FlatList, Image, TouchableOpacity, RefreshControl,
-  ActivityIndicator, StyleSheet, Platform, Modal, Pressable, TextInput
+  View,
+  Text,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+  StyleSheet,
+  Platform,
+  Modal,
+  Pressable,
+  TextInput,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseColor as c } from "../../components/Color";
-import { api} from "../../api/axios";
+import { api } from "../../api/axios";
 
 const CHIP_H = 34;
 
@@ -36,7 +46,9 @@ const U_Home = () => {
     }
   }, []);
 
-  useEffect(() => { fetchShops(); }, [fetchShops]);
+  useEffect(() => {
+    fetchShops();
+  }, [fetchShops]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -55,25 +67,36 @@ const U_Home = () => {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (shops || []).filter((it) => {
+      // ✅ แปลง status ให้เป็น boolean
+      const rawStatus = (it.status ?? "").toString().toLowerCase();
+      const isOpen =
+        rawStatus === "open" ||
+        rawStatus === "active" ||
+        rawStatus === "true" ||
+        rawStatus === "1";
       const status = (it.status || false);
-      const isOpen = status === "open" || status === "active";
       const reservable = !!it.reserve_active;
 
       if (q) {
-        const hay = `${it.shop_name || it.name || ""} ${it.description || ""} ${it.type || ""}`.toLowerCase();
+        const hay = `${it.shop_name || it.name || ""} ${it.description || ""} ${
+          it.type || ""
+        }`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (onlyOpen && !isOpen) return false;
       if (onlyReservable && !reservable) return false;
       if (type !== "all" && String(it.type) !== type) return false;
+
+      // ✅ คืนค่าใหม่ให้ FlatList ใช้ต่อได้สะดวก
+      it.isOpen = isOpen;
       return true;
     });
   }, [shops, query, onlyOpen, onlyReservable, type]);
 
   // การ์ด
   const renderShop = ({ item }) => {
+    const isOpen = item.isOpen === true;
     const s = (item.status || false);
-    const isOpen = s === "open" || s === "active";
     const isClosed = !isOpen;
 
     return (
@@ -81,7 +104,9 @@ const U_Home = () => {
         style={[styles.card, isClosed && styles.cardDisabled]}
         activeOpacity={0.9}
         disabled={isClosed}
-        onPress={() => navigation.navigate("UserShopDetail", { shopId: item.id, shop: item })}
+        onPress={() =>
+          navigation.navigate("UserShopDetail", { shopId: item.id, shop: item })
+        }
       >
         <View style={styles.imageWrap}>
           <Image
@@ -93,14 +118,30 @@ const U_Home = () => {
             style={styles.image}
           />
           <View style={styles.badgesRow}>
-            <View style={[styles.badge, isOpen ? styles.badgeOpen : styles.badgeClosed]}>
-              <Text style={[styles.badgeTxt, isOpen ? styles.badgeTxtOpen : styles.badgeTxtClosed]} allowFontScaling={false}>
+            <View
+              style={[
+                styles.badge,
+                isOpen ? styles.badgeOpen : styles.badgeClosed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.badgeTxt,
+                  isOpen ? styles.badgeTxtOpen : styles.badgeTxtClosed,
+                ]}
+                allowFontScaling={false}
+              >
                 {isOpen ? "เปิดอยู่" : "ปิดอยู่"}
               </Text>
             </View>
             {item.reserve_active && (
               <View style={[styles.badge, { backgroundColor: c.blue }]}>
-                <Text style={[styles.badgeTxt, { color: c.fullwhite }]} allowFontScaling={false}>จองร้าน</Text>
+                <Text
+                  style={[styles.badgeTxt, { color: c.fullwhite }]}
+                  allowFontScaling={false}
+                >
+                  จองร้าน
+                </Text>
               </View>
             )}
           </View>
@@ -116,9 +157,13 @@ const U_Home = () => {
           </Text>
 
           <View style={styles.meta}>
-            <Text style={styles.type} allowFontScaling={false}>{item.type || "ทั่วไป"}</Text>
+            <Text style={styles.type} allowFontScaling={false}>
+              {item.type || "ทั่วไป"}
+            </Text>
             <Text style={styles.price} allowFontScaling={false}>
-              {item.price_min != null && item.price_max != null ? `${item.price_min} - ${item.price_max} ฿` : "-"}
+              {item.price_min != null && item.price_max != null
+                ? `${item.price_min} - ${item.price_max} ฿`
+                : "-"}
             </Text>
           </View>
         </View>
@@ -130,14 +175,18 @@ const U_Home = () => {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={c.S2} />
-        <Text style={{ color: c.S5, marginTop: 8 }} allowFontScaling={false}>กำลังโหลดร้านค้า...</Text>
+        <Text style={{ color: c.S5, marginTop: 8 }} allowFontScaling={false}>
+          กำลังโหลดร้านค้า...
+        </Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header} allowFontScaling={false}>ร้านทั้งหมด</Text>
+      <Text style={styles.header} allowFontScaling={false}>
+        ร้านทั้งหมด
+      </Text>
 
       {/* 🔎 Search */}
       <View style={styles.searchRow}>
@@ -176,7 +225,10 @@ const U_Home = () => {
             color={onlyOpen ? c.fullwhite : c.S5}
             style={{ marginRight: 6 }}
           />
-          <Text style={[styles.toggleTxt, onlyOpen && { color: c.fullwhite }]} allowFontScaling={false}>
+          <Text
+            style={[styles.toggleTxt, onlyOpen && { color: c.fullwhite }]}
+            allowFontScaling={false}
+          >
             เปิดอยู่
           </Text>
         </Pressable>
@@ -186,7 +238,10 @@ const U_Home = () => {
           onPress={() => setOnlyReservable((v) => !v)}
           style={[
             styles.togglePill,
-            onlyReservable && { backgroundColor: c.green, borderColor: c.green },
+            onlyReservable && {
+              backgroundColor: c.green,
+              borderColor: c.green,
+            },
           ]}
           android_ripple={{ color: "#00000011" }}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -197,7 +252,10 @@ const U_Home = () => {
             color={onlyReservable ? c.fullwhite : c.S5}
             style={{ marginRight: 6 }}
           />
-          <Text style={[styles.toggleTxt, onlyReservable && { color: c.fullwhite }]} allowFontScaling={false}>
+          <Text
+            style={[styles.toggleTxt, onlyReservable && { color: c.fullwhite }]}
+            allowFontScaling={false}
+          >
             จองได้
           </Text>
         </Pressable>
@@ -205,11 +263,20 @@ const U_Home = () => {
         {/* เลือกประเภท — ข้อความล้วน */}
         <Pressable
           onPress={() => setTypePickerVisible(true)}
-          style={[styles.typeSelector, { flex: 1 }]}  // ไม่เปลี่ยนสีตามที่ขอ
+          style={[styles.typeSelector, { flex: 1 }]} // ไม่เปลี่ยนสีตามที่ขอ
           android_ripple={{ color: "#00000011" }}
         >
-          <Ionicons name="restaurant" size={16} color={c.S5} style={{ marginRight: 6 }} />
-          <Text style={styles.typeSelectorTxt} numberOfLines={1} allowFontScaling={false}>
+          <Ionicons
+            name="restaurant"
+            size={16}
+            color={c.S5}
+            style={{ marginRight: 6 }}
+          />
+          <Text
+            style={styles.typeSelectorTxt}
+            numberOfLines={1}
+            allowFontScaling={false}
+          >
             {type === "all" ? "ทุกประเภท" : type}
           </Text>
           <Ionicons name="chevron-down" size={16} color={c.S5} />
@@ -220,13 +287,23 @@ const U_Home = () => {
       <FlatList
         data={filtered}
         keyExtractor={(item, idx) =>
-          String(item.id ?? item.shop_id ?? item.shopId ?? `${item.shop_name ?? "shop"}-${idx}`)
+          String(item.id ?? `${item.shop_name ?? "shop"}-${idx}`)
         }
         renderItem={renderShop}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.S2} />}
-        ListEmptyComponent={<Text style={styles.emptyText} allowFontScaling={false}>ไม่พบร้านตามเงื่อนไข</Text>}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={c.S2}
+          />
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText} allowFontScaling={false}>
+            ไม่พบร้านตามเงื่อนไข
+          </Text>
+        }
         keyboardShouldPersistTaps="handled"
         removeClippedSubviews={Platform.OS === "android"}
         windowSize={5}
@@ -241,9 +318,14 @@ const U_Home = () => {
         onRequestClose={() => setTypePickerVisible(false)}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setTypePickerVisible(false)} />
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setTypePickerVisible(false)}
+          />
           <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle} allowFontScaling={false}>เลือกประเภทอาหาร</Text>
+            <Text style={styles.modalTitle} allowFontScaling={false}>
+              เลือกประเภทอาหาร
+            </Text>
 
             <FlatList
               data={typeOptions}
@@ -262,13 +344,18 @@ const U_Home = () => {
                     <Text
                       style={[
                         styles.typeRowTxt,
-                        selected && { fontWeight: "800", textDecorationLine: "underline" },
+                        selected && {
+                          fontWeight: "800",
+                          textDecorationLine: "underline",
+                        },
                       ]}
                       allowFontScaling={false}
                     >
                       {label}
                     </Text>
-                    {selected ? <Ionicons name="checkmark" size={18} color={c.S2} /> : null}
+                    {selected ? (
+                      <Ionicons name="checkmark" size={18} color={c.S2} />
+                    ) : null}
                   </Pressable>
                 );
               }}
@@ -276,8 +363,13 @@ const U_Home = () => {
               contentContainerStyle={{ paddingVertical: 8 }}
             />
 
-            <Pressable style={styles.modalClose} onPress={() => setTypePickerVisible(false)}>
-              <Text style={styles.modalCloseTxt} allowFontScaling={false}>ปิด</Text>
+            <Pressable
+              style={styles.modalClose}
+              onPress={() => setTypePickerVisible(false)}
+            >
+              <Text style={styles.modalCloseTxt} allowFontScaling={false}>
+                ปิด
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -291,10 +383,19 @@ export default U_Home;
 /* ---------- styles ---------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.fullwhite },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.fullwhite },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.fullwhite,
+  },
   header: {
-    fontSize: 22, fontWeight: "700", color: c.black,
-    marginTop: 10, marginLeft: 16, marginBottom: 6,
+    fontSize: 22,
+    fontWeight: "700",
+    color: c.black,
+    marginTop: 10,
+    marginLeft: 16,
+    marginBottom: 6,
   },
 
   /* Search */
@@ -332,7 +433,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   toggleTxt: {
-    color: c.black, fontWeight: "700", fontSize: 12, lineHeight: 16, includeFontPadding: false,
+    color: c.black,
+    fontWeight: "700",
+    fontSize: 12,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
 
   typeSelector: {
@@ -364,15 +469,40 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardDisabled: { opacity: 0.85 },
-  imageWrap: { position: "relative", width: "100%", height: 160, backgroundColor: c.S3 },
+  imageWrap: {
+    position: "relative",
+    width: "100%",
+    height: 160,
+    backgroundColor: c.S3,
+  },
   image: { width: "100%", height: "100%" },
-  dimOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.28)" },
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
 
-  badgesRow: { position: "absolute", left: 10, bottom: 10, flexDirection: "row" },
-  badge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, marginRight: 8, minHeight: 26, justifyContent: "center" },
+  badgesRow: {
+    position: "absolute",
+    left: 10,
+    bottom: 10,
+    flexDirection: "row",
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginRight: 8,
+    minHeight: 26,
+    justifyContent: "center",
+  },
   badgeOpen: { backgroundColor: "#dcfce7" },
   badgeClosed: { backgroundColor: "#fee2e2" },
-  badgeTxt: { fontSize: 12, fontWeight: "800", lineHeight: 14, includeFontPadding: false },
+  badgeTxt: {
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 14,
+    includeFontPadding: false,
+  },
   badgeTxtOpen: { color: "#166534" },
   badgeTxtClosed: { color: "#991b1b" },
 
@@ -403,16 +533,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: c.S4,
   },
-  modalTitle: { fontWeight: "800", color: c.black, fontSize: 16, marginBottom: 8 },
+  modalTitle: {
+    fontWeight: "800",
+    color: c.black,
+    fontSize: 16,
+    marginBottom: 8,
+  },
   typeRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    borderRadius: 12, borderWidth: 1, borderColor: c.S4, paddingHorizontal: 12, paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.S4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: c.fullwhite,
   },
   typeRowTxt: { color: c.black, fontWeight: "600", fontSize: 13 },
   modalClose: {
-    marginTop: 10, alignSelf: "flex-end", paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 10, backgroundColor: c.S2,
+    marginTop: 10,
+    alignSelf: "flex-end",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: c.S2,
   },
   modalCloseTxt: { color: c.fullwhite, fontWeight: "800" },
 });

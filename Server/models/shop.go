@@ -40,7 +40,7 @@ type Shop struct {
 	VendorID      string    `json:"vendor_id,omitempty" firestore:"-"`
 	OrderActive   bool      `json:"order_active" firestore:"order_active"`
 	ReserveActive bool      `json:"reserve_active" firestore:"reserve_active"`
-	Status        bool    `json:"status" firestore:"status"` // "open" | "closed"
+	Status        bool      `json:"status" firestore:"status"` // "open" | "closed"
 	CreatedAt     time.Time `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt" firestore:"updatedAt"`
 }

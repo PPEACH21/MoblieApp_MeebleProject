@@ -1,4 +1,4 @@
-import { m } from './src/paraglide/messages.js';
+import { m } from './paraglide/messages.js';
 import { getLocale,setLocale } from './src/paraglide/runtime.js';
 import { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
