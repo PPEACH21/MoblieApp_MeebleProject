@@ -119,16 +119,20 @@ func ChangePassword(c *fiber.Ctx)error{
     })
 	}
 	
-	data,err := config.User.Where("email","==",user.Email).Documents(config.Ctx).GetAll()
-	if err!=nil{
-		data,err = config.Vendor.Where("email","==",user.Email).Documents(config.Ctx).GetAll()
-		if err!=nil{
-			return c.Status(fiber.StatusBadGateway).SendString("Get data error")
+	data, err := config.User.Where("email", "==", user.Email).Documents(config.Ctx).GetAll()
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).SendString("Get data error")
+	}
+	
+	if len(data) == 0 {
+		data, err = config.Vendor.Where("email", "==", user.Email).Documents(config.Ctx).GetAll()
+		if err != nil {
+			return c.Status(fiber.StatusBadGateway).SendString("Get vendor data error")
 		}
 	}
 	
 	if len(data) == 0 {
-		return c.Status(fiber.StatusNotFound).SendString("not data")	
+		return c.Status(fiber.StatusNotFound).SendString("not data")
 	}
 	
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
