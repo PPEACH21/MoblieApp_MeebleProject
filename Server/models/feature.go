@@ -64,9 +64,7 @@ type Reservation struct {
 	ShopID    string    `json:"shop_id" firestore:"shop_id"`
 	UserID    string    `json:"user_id" firestore:"user_id"`
 	People    int       `json:"people" firestore:"people"`
-	Phone     string    `json:"phone,omitempty" firestore:"phone,omitempty"`
 	Note      string    `json:"note,omitempty" firestore:"note,omitempty"`
-	StartAt   time.Time `json:"startAt" firestore:"startAt"`
 	DayKey    string    `json:"dayKey" firestore:"dayKey"`
 	CreatedAt time.Time `json:"createdAt" firestore:"createdAt"`
 }

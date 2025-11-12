@@ -463,7 +463,6 @@ func dayKeyOf(t time.Time) string {
 
 // POST /shops/:id/reservations
 func CreateReservation(c *fiber.Ctx) error {
-
 	shopId := c.Params("id")
 	if shopId == "" {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "shop id required"})
@@ -483,55 +482,31 @@ func CreateReservation(c *fiber.Ctx) error {
 		body.People = 1
 	}
 
-	dk := dayKeyOf(body.StartAt)
 	col := config.Client.Collection(models.ColReservations)
+	doc := col.NewDoc()
 
-	err := config.Client.RunTransaction(config.Ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		q := col.
-			Where("shop_id", "==", shopId).
-			Where("dayKey", "==", dk)
-
-		snap, err := tx.Documents(q).GetAll()
-		if err != nil {
-			return err
-		}
-		if len(snap) > 0 {
-			// มีการจองวันนั้นอยู่แล้ว
-			var existed models.Reservation
-			if err := snap[0].DataTo(&existed); err == nil {
-				if existed.UserID == body.UserID {
-					return fmt.Errorf("E_DUP_BY_USER")
-				}
-			}
-			return fmt.Errorf("E_SHOP_DAY_TAKEN")
-		}
-
-		doc := col.NewDoc()
-		resv := models.Reservation{
-			ShopID:    shopId,
-			UserID:    body.UserID,
-			People:    body.People,
-			Phone:     body.Phone,
-			Note:      body.Note,
-			StartAt:   body.StartAt,
-			DayKey:    dk,
-			CreatedAt: now(),
-		}
-		return tx.Set(doc, resv)
-	})
-
-	if err != nil {
-		switch err.Error() {
-		case "E_DUP_BY_USER":
-			return c.Status(http.StatusConflict).JSON(fiber.Map{"error": "คุณได้จองวันนี้ไปแล้ว"})
-		case "E_SHOP_DAY_TAKEN":
-			return c.Status(http.StatusConflict).JSON(fiber.Map{"error": "ร้านนี้ถูกจองไปแล้วในวันนี้"})
-		default:
-			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to create reservation", "msg": err.Error()})
-		}
+	resv := models.Reservation{
+		ID:        doc.ID,
+		ShopID:    shopId,
+		UserID:    body.UserID,
+		People:    body.People,
+		Note:      body.Note,
+		DayKey:    dayKeyOf(body.StartAt),
+		CreatedAt: now(),
 	}
 
-	return c.JSON(fiber.Map{"ok": true})
+	if _, err := doc.Set(config.Ctx, resv); err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to create reservation",
+			"msg":   err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"ok":      true,
+		"message": "จองสำเร็จทันที",
+		"data":    resv,
+	})
 }
 
 // ✅ GET /shops/:id/reservations
@@ -561,20 +536,4 @@ func ListReservationsByShop(c *fiber.Ctx) error {
 		}
 	}
 	return c.JSON(fiber.Map{"reservations": items})
-}
-
-// ✅ DELETE /reservations/:id
-func DeleteReservation(c *fiber.Ctx) error {
-	id := c.Params("id")
-	if id == "" {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "id required"})
-	}
-
-	ref := config.Client.Collection(models.ColReservations).Doc(id)
-	_, err := ref.Delete(config.Ctx)
-	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to delete", "msg": err.Error()})
-	}
-
-	return c.JSON(fiber.Map{"ok": true})
 }

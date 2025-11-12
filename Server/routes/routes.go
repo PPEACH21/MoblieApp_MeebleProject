@@ -9,7 +9,7 @@ import (
 
 func Routes(app *fiber.App) {
 	app.Get("/profile", middlewares.Profile)
-	app.Put("/profile/:id",controllers.UpdateProfile)
+	app.Put("/profile/:id", controllers.UpdateProfile)
 	app.Post("/sendotp", service.OTPvertify())
 	app.Put("/verifiedEmail/:id", controllers.VerifiedUser)
 
@@ -41,7 +41,6 @@ func Routes(app *fiber.App) {
 	/* ---------- RESERVATIONS ---------- */
 	app.Post("/shops/:id/reservations", controllers.CreateReservation)
 	app.Get("/shops/:id/reservations", controllers.ListReservationsByShop)
-	app.Delete("/reservations/:id", controllers.DeleteReservation)
 	/* ---------- CART ---------- */
 	app.Get("/cart", controllers.GetCart)
 	app.Post("/cart/add", controllers.AddToCart)
