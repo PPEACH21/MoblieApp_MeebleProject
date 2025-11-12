@@ -1,6 +1,3 @@
-import { m } from './paraglide/messages.js';
-import { getLocale,setLocale } from './src/paraglide/runtime.js';
-import { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import StackNav from './src/StackNav.js';
 import { SafeAreaView } from 'react-native-safe-area-context';
