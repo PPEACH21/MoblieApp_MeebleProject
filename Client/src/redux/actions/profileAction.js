@@ -20,6 +20,7 @@ export const getProfile=()=>async(dispatch)=>{
             firstname: res.data.firstname || "",
             lastname: res.data.lastname || "",
             username: res.data.username || "",
+            coin: res.data.coin || 0,
             email: res.data.email || "",
             avatar: res.data.avatar || "",
         };

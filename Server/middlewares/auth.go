@@ -1,7 +1,6 @@
 package middlewares
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/PPEACH21/MoblieApp_MeebleProject/config"
@@ -25,7 +24,7 @@ func Profile(c *fiber.Ctx) error {
 	userID := claims["user_id"].(string)
 	role := claims["role"].(string)
 
-	fmt.Println("user:", user)
+	// fmt.Println("user:", user)
 	doc, err := config.User.Doc(userID).Get(config.Ctx)
 	if err != nil {
 		doc, err = config.Vendor.Doc(userID).Get(config.Ctx)

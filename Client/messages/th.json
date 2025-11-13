@@ -240,5 +240,16 @@
   "second": "วินาที",
   "confirm": "ยืนยัน",
   "RenewPassword": "โปรดใส่รหัสผ่านใหม่ของคุณ",
-  "changePassword": "เปลี่ยนรหัส"
+  "changePassword": "เปลี่ยนรหัส",
+  "Home": "หน้าแรก",
+  "Orders": "คำสั่งซื้อ",
+  "Reservations": "การจอง",
+  "Settings": "ตั่งค่า",
+  "selectedrestarant": "เลือกประเภทร้าน",
+  "RemovefromCart":"ออกจากตะกร้า",
+  "createdAt":"สร้างเมื่อ",
+  "No":"เลขที่",
+  "Failedorders":"โหลดคำสั่งซื้อไม่สำเร็จ",
+  "noitemorders":"ไม่มีสินค้าในคำสั่งซื้อนี้",
+  "back": "กลับ"
 }
