@@ -73,13 +73,12 @@ func CreateShop(c *fiber.Ctx) error {
 	in.UpdatedAt = now
 
 	var vendorRef *firestore.DocumentRef
-	if in.VendorID  != "" {
-		vendorRef = config.Vendor.Doc(in.VendorID )
+	if in.VendorID != "" {
+		vendorRef = config.Vendor.Doc(in.VendorID)
 	}
 
 	in.VendorRef = vendorRef
 	docRef, _, err := config.Client.Collection("shops").Add(config.Ctx, in)
-
 
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -352,22 +351,34 @@ func UpdateShopBasic(c *fiber.Ctx) error {
 
 	var body models.UpdateShopBody
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid json"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid json",
+			"msg":   err.Error(),
+		})
 	}
 
-	updates := make([]firestore.Update, 0, 8)
+	updates := make([]firestore.Update, 0, 16)
 	now := time.Now()
 
+	// ---------- ฟิลด์เดิม ----------
 	if body.ShopName != nil {
 		name := strings.TrimSpace(*body.ShopName)
 		if name == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "shop_name cannot be empty"})
 		}
-		updates = append(updates, firestore.Update{Path: "shop_name", Value: name})
+		updates = append(updates, firestore.Update{
+			Path:  "shop_name",
+			Value: name,
+		})
 	}
+
 	if body.Description != nil {
-		updates = append(updates, firestore.Update{Path: "description", Value: strings.TrimSpace(*body.Description)})
+		updates = append(updates, firestore.Update{
+			Path:  "description",
+			Value: strings.TrimSpace(*body.Description),
+		})
 	}
+
 	if body.Type != nil {
 		t := strings.TrimSpace(*body.Type)
 		if !models.IsAllowedType(t) {
@@ -375,22 +386,71 @@ func UpdateShopBasic(c *fiber.Ctx) error {
 				"error": "type must be one of: MainCourse, Beverage, FastFoods, Appetizer, Dessert",
 			})
 		}
-		updates = append(updates, firestore.Update{Path: "type", Value: t})
+		updates = append(updates, firestore.Update{
+			Path:  "type",
+			Value: t,
+		})
 	}
+
 	if body.Image != nil {
-		updates = append(updates, firestore.Update{Path: "image", Value: strings.TrimSpace(*body.Image)})
+		updates = append(updates, firestore.Update{
+			Path:  "image",
+			Value: strings.TrimSpace(*body.Image),
+		})
 	}
+
 	if body.Address != nil {
-		addr := map[string]any{}
 		if body.Address.Latitude != 0 || body.Address.Longitude != 0 {
-			addr["latitude"] = body.Address.Latitude
-			addr["longitude"] = body.Address.Longitude
-			updates = append(updates, firestore.Update{Path: "address", Value: addr})
+			addr := map[string]any{
+				"latitude":  body.Address.Latitude,
+				"longitude": body.Address.Longitude,
+			}
+			updates = append(updates, firestore.Update{
+				Path:  "address",
+				Value: addr,
+			})
 		}
 	}
-	updates = append(updates, firestore.Update{Path: "updatedAt", Value: now})
+
+	// ---------- toggle fields ----------
+	if body.OrderActive != nil {
+		updates = append(updates, firestore.Update{
+			Path:  "order_active",
+			Value: *body.OrderActive, // bool
+		})
+	}
+
+	if body.ReserveActive != nil {
+		updates = append(updates, firestore.Update{
+			Path:  "reserve_active",
+			Value: *body.ReserveActive, // bool
+		})
+	}
+
+	// ✅ status เป็น bool (true = open, false = closed)
+	if body.Status != nil {
+		updates = append(updates, firestore.Update{
+			Path:  "status",
+			Value: *body.Status,
+		})
+
+		// ถ้าปิดร้าน -> ปิดรับ order / reserve ไปด้วย
+		if !*body.Status {
+			updates = append(updates,
+				firestore.Update{Path: "order_active", Value: false},
+				firestore.Update{Path: "reserve_active", Value: false},
+			)
+		}
+	}
+
+	// ---------- updatedAt ----------
+	updates = append(updates, firestore.Update{
+		Path:  "updatedAt",
+		Value: now,
+	})
 
 	docRef := config.Client.Collection(models.ColShops).Doc(shopId)
+
 	if len(updates) > 0 {
 		if _, err := docRef.Update(config.Ctx, updates); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -404,8 +464,10 @@ func UpdateShopBasic(c *fiber.Ctx) error {
 	if err != nil || !snap.Exists() {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "shop not found after update"})
 	}
+
 	out := snap.Data()
 	out["id"] = snap.Ref.ID
+
 	return c.JSON(fiber.Map{"shop": out})
 }
 

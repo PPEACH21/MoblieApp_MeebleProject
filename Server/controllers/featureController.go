@@ -475,9 +475,6 @@ func CreateReservation(c *fiber.Ctx) error {
 	if body.UserID == "" {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "user_id required"})
 	}
-	if body.StartAt.IsZero() {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "startAt required"})
-	}
 	if body.People <= 0 {
 		body.People = 1
 	}
@@ -491,7 +488,6 @@ func CreateReservation(c *fiber.Ctx) error {
 		UserID:    body.UserID,
 		People:    body.People,
 		Note:      body.Note,
-		DayKey:    dayKeyOf(body.StartAt),
 		CreatedAt: now(),
 	}
 

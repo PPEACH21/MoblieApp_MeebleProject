@@ -25,7 +25,8 @@ import Constants from "expo-constants";
 import { BaseColor } from "../../components/Color";
 import { useDispatch, useSelector } from "react-redux";
 import { resetAuth } from "../../redux/slices/authSlice";
-import { getLocale,setLocale } from "../../paraglide/runtime";
+import { getLocale, setLocale } from "../../paraglide/runtime";
+
 const STATUS_OPEN = "open";
 const STATUS_CLOSED = "closed";
 
@@ -41,7 +42,12 @@ const TYPE_LABEL = {
 
 /* ---------- Base styles ที่ใช้สีจาก BaseColor ---------- */
 const baseStyles = {
-  container: { flex: 1, padding: 16, paddingBottom:100,backgroundColor: "white" },
+  container: {
+    flex: 1,
+    padding: 16,
+    paddingBottom: 100,
+    backgroundColor: "white",
+  },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 22, fontWeight: "800", color: BaseColor.black },
   error: { color: BaseColor.red, marginTop: 6, textAlign: "center" },
@@ -65,8 +71,8 @@ const baseStyles = {
     elevation: 3,
   },
   row: {
-    height:60,
-    paddingHorizontal:10,
+    height: 60,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderColor: BaseColor.S3,
     flexDirection: "row",
@@ -105,7 +111,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 12,
-    paddingHorizontal:10,
+    paddingHorizontal: 10,
     marginBottom: 8,
   },
   primaryBtn: {
@@ -217,18 +223,26 @@ const toErr = (e, fallback = "เกิดข้อผิดพลาด") => {
 
 const toBool = (v) => v === true || v === "true" || v === 1 || v === "1";
 
+/** ✅ normalize status ให้เป็น bool เสมอ (true=open, false=closed) */
 const normalizeShop = (s) =>
   s
     ? {
         ...s,
         order_active: !!toBool(s.order_active),
         reserve_active: !!toBool(s.reserve_active),
-        status:
-          (s.status || s.shop_status || s.State || STATUS_OPEN)
-            .toString()
-            .toLowerCase() === STATUS_CLOSED
-            ? STATUS_CLOSED
-            : STATUS_OPEN,
+        status: (() => {
+          const raw = s.status ?? s.shop_status ?? s.State;
+
+          if (typeof raw === "boolean") return raw;
+
+          if (raw == null) return true; // default เปิดไว้
+
+          const text = String(raw).toLowerCase();
+          if (text === "open") return true;
+          if (text === "closed") return false;
+
+          return true;
+        })(),
       }
     : s;
 
@@ -295,12 +309,13 @@ async function uploadToImgbb(base64) {
   return json?.data?.display_url || json?.data?.url;
 }
 
-export default function SettingShop({navigation}) {
+export default function SettingShop({ navigation }) {
   const Dispatch = useDispatch();
   const Auth = useSelector((state) => state.auth);
   const headers = Auth.token
     ? { Authorization: `Bearer ${Auth.token}` }
     : undefined;
+
   const [shop, setShop] = useState(null);
   const [shopId, setShopId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -325,13 +340,14 @@ export default function SettingShop({navigation}) {
 
   const [language, setLaguage] = useState(getLocale());
   const toggleLanguage = () => {
-      const newLang = language === "th" ? "en" : "th";
-      console.log(language)
-      setLocale(newLang);
-      setLaguage(newLang);
+    const newLang = language === "th" ? "en" : "th";
+    console.log(language);
+    setLocale(newLang);
+    setLaguage(newLang);
   };
 
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+
   const getShopId = useCallback(async () => {
     if (!Auth?.user) return; // รอ auth พร้อมก่อน
     try {
@@ -341,12 +357,12 @@ export default function SettingShop({navigation}) {
       console.log("Could not find shop for user", e?.message);
       setShopId(null);
     }
-  }, [Auth?.user]); // ไม่ต้องใส่ api ใน deps
+  }, [Auth?.user]);
 
   useEffect(() => {
     getShopId();
   }, [getShopId]);
-  
+
   const fetchShop = useCallback(async () => {
     if (!shopId) return; // กันไว้ก่อน
     try {
@@ -371,31 +387,28 @@ export default function SettingShop({navigation}) {
     fetchShop();
   }, [shopId, fetchShop]);
 
+  /** ✅ อัปเดตบางฟิลด์ของร้าน */
   const updateShopPartial = useCallback(
     async (patch) => {
       const id = shop?.ID || shop?.id || shopId;
-      await api.put(`/shop/${id}/update`, patch, {
-        headers: headers,
-      });
+      await api.put(`/shop/${id}/update`, patch, { headers });
       setShop((prev) => (prev ? { ...prev, ...patch } : prev));
     },
-    [shop?.ID, shop?.id, shopId]
+    [shop?.ID, shop?.id, shopId, headers]
   );
 
-  const isOpen = (shop?.status || STATUS_OPEN) === STATUS_OPEN;
+  /** ✅ status เก็บเป็น bool แล้ว ใช้ !! เพื่อกัน undefined */
+  const isOpen = !!shop?.status;
 
   const onToggleShop = async (val) => {
     try {
       setSaving((s) => ({ ...s, shop: true }));
       if (val) {
-        await updateShopPartial({ status: STATUS_OPEN });
+        await updateShopPartial({ status: true });
       } else {
-        await updateShopPartial({
-          status: STATUS_CLOSED,
-          order_active: false,
-          reserve_active: false,
-        });
+        await updateShopPartial({ status: false });
       }
+      await fetchShop(); // sync จาก DB
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะร้านไม่สำเร็จ");
       setErr(er);
@@ -416,6 +429,7 @@ export default function SettingShop({navigation}) {
     try {
       setSaving((s) => ({ ...s, order: true }));
       await updateShopPartial({ order_active: !!val });
+      await fetchShop();
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะรับออเดอร์ไม่สำเร็จ");
       setErr(er);
@@ -436,6 +450,7 @@ export default function SettingShop({navigation}) {
     try {
       setSaving((s) => ({ ...s, reserve: true }));
       await updateShopPartial({ reserve_active: !!val });
+      await fetchShop();
     } catch (e) {
       const er = toErr(e, "อัปเดตสถานะรับการจองไม่สำเร็จ");
       setErr(er);
@@ -527,9 +542,7 @@ export default function SettingShop({navigation}) {
 
       // optimistic UI
       setShop((prev) => (prev ? { ...prev, ...patch } : prev));
-      await api.put(`/shop/${id}/update`, patch, {
-        headers: headers,
-      });
+      await api.put(`/shop/${id}/update`, patch, { headers });
 
       setOpenEdit(false);
       await fetchShop();
@@ -544,8 +557,6 @@ export default function SettingShop({navigation}) {
       setUploadingImage(false);
     }
   };
-  
-  
 
   /* ---------- renders ---------- */
   if (loading) {
@@ -577,170 +588,187 @@ export default function SettingShop({navigation}) {
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <ScrollView>
-      <StatusBar style="dark" />
-      <View style={baseStyles.container}>
-        {shopImg ? (
-          <Image
-            source={{ uri: shopImg }}
-            style={{ width: "100%", height: 200, borderRadius: 12 }}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[baseStyles.noImage, { height: 200, borderRadius: 12 }]}>
-            <Text style={{ color: "#9ca3af" }}>ไม่มีรูปภาพ</Text>
-          </View>
-        )}
-
-        <View style={styles.headerRow}>
-          <Text style={baseStyles.title}>ร้านของฉัน</Text>
-          <Pressable onPress={openEditModal} style={styles.primaryBtn}>
-            <Text style={styles.primaryText}>แก้ไขร้าน</Text>
-          </Pressable>
-        </View>
-
-        <View style={baseStyles.card}>
-          {/* ชื่อร้าน */}
-          <View style={baseStyles.row}>
-            <Text style={baseStyles.label}>ชื่อร้าน</Text>
-            <Text style={baseStyles.value}>{shopName}</Text>
-          </View>
-
-          {/* สถานะร้าน */}
-          <View style={baseStyles.row}>
-            <View style={baseStyles.left}>
-              <Text style={baseStyles.label}>สถานะร้าน</Text>
-              <Text
-                style={[
-                  baseStyles.badge,
-                  { backgroundColor: isOpen ? BaseColor.green : BaseColor.red },
-                ]}
-              >
-                {isOpen ? "เปิด" : "ปิด"}
-              </Text>
+        <StatusBar style="dark" />
+        <View style={baseStyles.container}>
+          {shopImg ? (
+            <Image
+              source={{ uri: shopImg }}
+              style={{ width: "100%", height: 200, borderRadius: 12 }}
+              resizeMode="cover"
+            />
+          ) : (
+            <View
+              style={[baseStyles.noImage, { height: 200, borderRadius: 12 }]}
+            >
+              <Text style={{ color: "#9ca3af" }}>ไม่มีรูปภาพ</Text>
             </View>
-            <View style={baseStyles.right}>
-              {saving.shop ? (
-                <ActivityIndicator color={BaseColor.S2} />
-              ) : (
-                <Switch
-                  value={isOpen}
-                  onValueChange={onToggleShop}
-                  trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
-                  thumbColor={isOpen ? BaseColor.S2 : BaseColor.fullwhite}
-                />
-              )}
-            </View>
-          </View>
-
-          {/* รับออเดอร์ */}
-          <View style={baseStyles.row}>
-            <View style={baseStyles.left}>
-              <Text style={baseStyles.label}>รับออเดอร์</Text>
-              <Text
-                style={[
-                  baseStyles.badge,
-                  {
-                    backgroundColor:
-                      toBool(shop?.order_active) && isOpen
-                        ? BaseColor.green
-                        : BaseColor.S3,
-                    color:
-                      toBool(shop?.order_active) && isOpen
-                        ? BaseColor.fullwhite
-                        : BaseColor.black,
-                  },
-                ]}
-              >
-                {toBool(shop?.order_active) && isOpen ? "เปิด" : "ปิด"}
-              </Text>
-            </View>
-            <View style={baseStyles.right}>
-              {saving.order ? (
-                <ActivityIndicator color={BaseColor.S2} />
-              ) : (
-                <Switch
-                  value={!!toBool(shop?.order_active) && isOpen}
-                  onValueChange={onToggleOrder}
-                  disabled={!isOpen}
-                  trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
-                  thumbColor={
-                    !!toBool(shop?.order_active) && isOpen
-                      ? BaseColor.S2
-                      : BaseColor.fullwhite
-                  }
-                />
-              )}
-            </View>
-          </View>
-
-          {/* รับการจอง */}
-          <View style={baseStyles.row}>
-            <View style={baseStyles.left}>
-              <Text style={baseStyles.label}>รับการจอง</Text>
-              <Text
-                style={[
-                  baseStyles.badge,
-                  {
-                    backgroundColor:
-                      toBool(shop?.reserve_active) && isOpen
-                        ? BaseColor.blue
-                        : BaseColor.S3,
-                    color:
-                      toBool(shop?.reserve_active) && isOpen
-                        ? BaseColor.fullwhite
-                        : BaseColor.black,
-                  },
-                ]}
-              >
-                {toBool(shop?.reserve_active) && isOpen ? "เปิด" : "ปิด"}
-              </Text>
-            </View>
-            <View style={baseStyles.right}>
-              {saving.reserve ? (
-                <ActivityIndicator color={BaseColor.S2} />
-              ) : (
-                <Switch
-                  value={!!toBool(shop?.reserve_active) && isOpen}
-                  onValueChange={onToggleReserve}
-                  disabled={!isOpen}
-                  trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
-                  thumbColor={
-                    !!toBool(shop?.reserve_active) && isOpen
-                      ? BaseColor.S2
-                      : BaseColor.fullwhite
-                  }
-                />
-              )}
-            </View>
-          </View>
-
-          <View style={baseStyles.row}>
-            <View style={baseStyles.left}>
-              <Text style={baseStyles.label}>ประเภท:</Text>
-              <Text style={baseStyles.value}>
-                {TYPE_LABEL[shop?.type] || shop?.type || "—"}
-              </Text>
-            </View>
-          </View>
-
-          {!!err && (
-            <Text style={[baseStyles.error, { marginTop: 12 }]}>
-              {err.status ? `HTTP ${err.status}: ` : ""}
-              {err.message}
-            </Text>
           )}
+
+          <View style={styles.headerRow}>
+            <Text style={baseStyles.title}>ร้านของฉัน</Text>
+            <Pressable onPress={openEditModal} style={styles.primaryBtn}>
+              <Text style={styles.primaryText}>แก้ไขร้าน</Text>
+            </Pressable>
+          </View>
+
+          <View style={baseStyles.card}>
+            {/* ชื่อร้าน */}
+            <View style={baseStyles.row}>
+              <Text style={baseStyles.label}>ชื่อร้าน</Text>
+              <Text style={baseStyles.value}>{shopName}</Text>
+            </View>
+
+            {/* สถานะร้าน */}
+            <View style={baseStyles.row}>
+              <View style={baseStyles.left}>
+                <Text style={baseStyles.label}>สถานะร้าน</Text>
+                <Text
+                  style={[
+                    baseStyles.badge,
+                    {
+                      backgroundColor: isOpen ? BaseColor.green : BaseColor.red,
+                    },
+                  ]}
+                >
+                  {isOpen ? "เปิด" : "ปิด"}
+                </Text>
+              </View>
+              <View style={baseStyles.right}>
+                {saving.shop ? (
+                  <ActivityIndicator color={BaseColor.S2} />
+                ) : (
+                  <Switch
+                    value={isOpen}
+                    onValueChange={onToggleShop}
+                    trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
+                    thumbColor={isOpen ? BaseColor.S2 : BaseColor.fullwhite}
+                  />
+                )}
+              </View>
+            </View>
+
+            {/* รับออเดอร์ */}
+            <View style={baseStyles.row}>
+              <View style={baseStyles.left}>
+                <Text style={baseStyles.label}>รับออเดอร์</Text>
+                <Text
+                  style={[
+                    baseStyles.badge,
+                    {
+                      backgroundColor:
+                        toBool(shop?.order_active) && isOpen
+                          ? BaseColor.green
+                          : BaseColor.S3,
+                      color:
+                        toBool(shop?.order_active) && isOpen
+                          ? BaseColor.fullwhite
+                          : BaseColor.black,
+                    },
+                  ]}
+                >
+                  {toBool(shop?.order_active) && isOpen ? "เปิด" : "ปิด"}
+                </Text>
+              </View>
+              <View style={baseStyles.right}>
+                {saving.order ? (
+                  <ActivityIndicator color={BaseColor.S2} />
+                ) : (
+                  <Switch
+                    value={!!toBool(shop?.order_active) && isOpen}
+                    onValueChange={onToggleOrder}
+                    disabled={!isOpen}
+                    trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
+                    thumbColor={
+                      !!toBool(shop?.order_active) && isOpen
+                        ? BaseColor.S2
+                        : BaseColor.fullwhite
+                    }
+                  />
+                )}
+              </View>
+            </View>
+
+            {/* รับการจอง */}
+            <View style={baseStyles.row}>
+              <View style={baseStyles.left}>
+                <Text style={baseStyles.label}>รับการจอง</Text>
+                <Text
+                  style={[
+                    baseStyles.badge,
+                    {
+                      backgroundColor:
+                        toBool(shop?.reserve_active) && isOpen
+                          ? BaseColor.blue
+                          : BaseColor.S3,
+                      color:
+                        toBool(shop?.reserve_active) && isOpen
+                          ? BaseColor.fullwhite
+                          : BaseColor.black,
+                    },
+                  ]}
+                >
+                  {toBool(shop?.reserve_active) && isOpen ? "เปิด" : "ปิด"}
+                </Text>
+              </View>
+              <View style={baseStyles.right}>
+                {saving.reserve ? (
+                  <ActivityIndicator color={BaseColor.S2} />
+                ) : (
+                  <Switch
+                    value={!!toBool(shop?.reserve_active) && isOpen}
+                    onValueChange={onToggleReserve}
+                    disabled={!isOpen}
+                    trackColor={{ false: BaseColor.S3, true: BaseColor.S1 }}
+                    thumbColor={
+                      !!toBool(shop?.reserve_active) && isOpen
+                        ? BaseColor.S2
+                        : BaseColor.fullwhite
+                    }
+                  />
+                )}
+              </View>
+            </View>
+
+            <View style={baseStyles.row}>
+              <View style={baseStyles.left}>
+                <Text style={baseStyles.label}>ประเภท:</Text>
+                <Text style={baseStyles.value}>
+                  {TYPE_LABEL[shop?.type] || shop?.type || "—"}
+                </Text>
+              </View>
+            </View>
+
+            {!!err && (
+              <Text style={[baseStyles.error, { marginTop: 12 }]}>
+                {err.status ? `HTTP ${err.status}: ` : ""}
+                {err.message}
+              </Text>
+            )}
+          </View>
+
+          <Text style={{ paddingTop: 20, fontSize: 20, fontWeight: "bold" }}>
+            ระบบ
+          </Text>
+          <View style={baseStyles.card}>
+            <Pressable
+              style={[baseStyles.row, { justifyContent: "center" }]}
+              onPress={toggleLanguage}
+            >
+              <Text>เปลี่ยนภาษา</Text>
+            </Pressable>
+            <Pressable
+              style={[baseStyles.row, { justifyContent: "center" }]}
+              onPress={() => {
+                Dispatch(resetAuth());
+                navigation.replace("Splash");
+              }}
+            >
+              <Text style={{ color: c.red, fontWeight: "bold" }}>
+                ออกจากระบบ
+              </Text>
+            </Pressable>
+          </View>
         </View>
-        
-        <Text style={{paddingTop:20, fontSize:20, fontWeight:'bold'}}>ระบบ</Text>
-        <View style={baseStyles.card}>
-          <Pressable style={[baseStyles.row ,{justifyContent:'center'}]} onPress={toggleLanguage}>
-            <Text>เปลี่ยนภาษา</Text>
-          </Pressable>
-          <Pressable style={[baseStyles.row ,{justifyContent:'center'}]} onPress={()=>{Dispatch(resetAuth());navigation.replace("Splash")}}>
-            <Text style={{color:c.red,fontWeight:'bold'}}>ออกจากระบบ</Text>
-          </Pressable>
-        </View>
-      </View>
       </ScrollView>
 
       {/* โมดัลแก้ไขร้าน */}
