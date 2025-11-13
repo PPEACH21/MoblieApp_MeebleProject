@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -719,5 +720,54 @@ func UpdateProfile(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "profile updated successfully",
 		"user":    dbuser,
+	})
+}
+func GetUserReservations(c *fiber.Ctx) error {
+	// 1) รับ userId จาก query (?userId=xxx)
+	userId := c.Query("userId")
+	if userId == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "userId required",
+		})
+	}
+
+	ctx := config.Ctx
+	client := config.Client
+
+	// 2) ดึงจาก collection "reservations" (ดูให้ตรงกับที่ตั้งชื่อไว้ใน models.ColReservations)
+	//    อย่าลืม field ใน Firestore ชื่อ user_id (snake_case) ไม่ใช่ UserID
+	colName := models.ColReservations // เช่น "reservations"
+	q := client.Collection(colName).
+		Where("user_id", "==", userId).
+		OrderBy("createdAt", firestore.Desc)
+
+	docs, err := q.Documents(ctx).GetAll()
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to query reservations",
+			"msg":   err.Error(),
+		})
+	}
+
+	// 3) map เป็น slice ส่งให้ FE
+	out := make([]models.Reservation, 0, len(docs))
+	for _, doc := range docs {
+		var r models.Reservation
+		if err := doc.DataTo(&r); err != nil {
+			// ถ้า map ไม่ได้ให้ log แล้วข้ามไป
+			continue
+		}
+
+		// เผื่อคุณไม่ได้เก็บ ID ลง struct
+		if r.ID == "" {
+			r.ID = doc.Ref.ID
+		}
+
+		out = append(out, r)
+	}
+
+	return c.JSON(fiber.Map{
+		"ok":    true,
+		"items": out,
 	})
 }

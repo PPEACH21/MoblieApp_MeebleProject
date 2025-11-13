@@ -14,7 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { api } from "../../api/axios";
 import { BaseColor as c } from "../../components/Color";
 import { useSelector, useDispatch } from "react-redux";
-import {Btn} from "../../components/Button"
+import { Btn } from "../../components/Button";
 
 /* ---------- config ---------- */
 const STATUSES = ["prepare", "ready", "completed"];
@@ -85,6 +85,7 @@ const computeTotal = (order) => {
   return sum;
 };
 
+/* ---------- normalize orders + ดึงชื่อเมนู ---------- */
 const normalizeOrders = (data) => {
   let list = [];
   if (!data) return list;
@@ -99,6 +100,7 @@ const normalizeOrders = (data) => {
     const rawStatus = o.status || o.state || o.order_status || "prepare";
     const status = mapStatus(rawStatus);
     const createdAt = o.createdAt || o.created_at || o.time || o.timestamp;
+
     const customer =
       o.customerName ||
       o.customer_name ||
@@ -106,14 +108,30 @@ const normalizeOrders = (data) => {
       o.buyer ||
       o.raw?.customer?.name ||
       "-";
-    const itemsCount =
-      (o.raw?.items || o.items || []).reduce(
-        (acc, it) => acc + (toNum(it.qty ?? it.quantity ?? 1) || 1),
-        0
-      ) || 0;
+
+    const items = o.raw?.items || o.items || [];
+    const itemsCount = items.reduce(
+      (acc, it) => acc + (toNum(it.qty ?? it.quantity ?? 1) || 1),
+      0
+    );
+
+    // 🧾 เก็บชื่อเมนูสำหรับใช้โชว์
+    const itemNames = items
+      .map((it) => it.name || it.title || it.menu_name || null)
+      .filter(Boolean);
+
     const total = computeTotal(o);
 
-    return { ...o, id, status, createdAt, customer, itemsCount, total };
+    return {
+      ...o,
+      id,
+      status,
+      createdAt,
+      customer,
+      itemsCount,
+      total,
+      itemNames, // 👈 เพิ่ม field นี้
+    };
   });
 };
 
@@ -146,7 +164,9 @@ export default function OrderShop() {
 
   const Dispath = useDispatch();
   const Auth = useSelector((state) => state.auth);
-  const headers = Auth.token ? { Authorization: `Bearer ${Auth.token}` } : undefined;
+  const headers = Auth.token
+    ? { Authorization: `Bearer ${Auth.token}` }
+    : undefined;
 
   const getShopId = useCallback(async () => {
     if (!Auth?.user || !Auth?.token) return;
@@ -165,69 +185,93 @@ export default function OrderShop() {
 
   const SHOP_ID = shopId;
 
-  const fetchOrders = useCallback(async () => {
-    if (!SHOP_ID) return;
-    try {
-      setErr(null);
-      setLoading(true);
-
-      const params =
-        filter !== "all" && STATUSES.includes(filter) ? { status: filter } : {};
-
-      let res;
+  const fetchOrders = useCallback(
+    async () => {
+      if (!SHOP_ID) return;
       try {
-        res = await api.get(`/shop/${SHOP_ID}/orders`, { headers, params });
-      } catch (e1) {
-        if (e1?.response?.status === 404) {
-          setOrders([]);
-          setErr(null);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        }
+        setErr(null);
+        setLoading(true);
+
+        const params =
+          filter !== "all" && STATUSES.includes(filter)
+            ? { status: filter }
+            : {};
+
+        let res;
         try {
-          res = await api.get(`/shops/${SHOP_ID}/orders`, { headers, params });
-        } catch (e2) {
-          if (e2?.response?.status === 404) {
+          res = await api.get(`/shop/${SHOP_ID}/orders`, { headers, params });
+        } catch (e1) {
+          if (e1?.response?.status === 404) {
             setOrders([]);
             setErr(null);
             setLoading(false);
             setRefreshing(false);
             return;
           }
-          throw e2;
+          try {
+            res = await api.get(`/shops/${SHOP_ID}/orders`, {
+              headers,
+              params,
+            });
+          } catch (e2) {
+            if (e2?.response?.status === 404) {
+              setOrders([]);
+              setErr(null);
+              setLoading(false);
+              setRefreshing(false);
+              return;
+            }
+            throw e2;
+          }
         }
+
+        let list = normalizeOrders(res?.data);
+        if (filter !== "all") {
+          list = list.filter((o) => o.status === filter);
+        }
+
+        setOrders(list);
+      } catch (e) {
+        setErr(toErr(e, "โหลดออเดอร์ไม่สำเร็จ"));
+        setOrders([]);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
+    },
+    [SHOP_ID, filter, Auth?.token]
+  );
 
-      const list = normalizeOrders(res?.data);
-      const filtered =
-        filter === "all" ? list : list.filter((o) => o.status === filter);
+  const fetchHistory = useCallback(
+    async () => {
+      if (!SHOP_ID) return;
+      try {
+        setErr(null);
+        setLoadingHistory(true);
+        const res = await api.get(`/shop/${SHOP_ID}/history`, { headers });
+        let list = normalizeOrders(res?.data?.history ?? res?.data);
 
-      setOrders(filtered);
-    } catch (e) {
-      setErr(toErr(e, "โหลดออเดอร์ไม่สำเร็จ"));
-      setOrders([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [SHOP_ID, filter, Auth?.token]);
+        // ✅ เรียงตามวันเวลา — ล่าสุดอยู่บนสุด
+        const getTime = (o) => {
+          const d =
+            toDate(o.createdAt) ||
+            toDate(o.timestamp) ||
+            toDate(o.time) ||
+            null;
+          return d ? d.getTime() : 0;
+        };
+        list.sort((a, b) => getTime(b) - getTime(a));
 
-  const fetchHistory = useCallback(async () => {
-    if (!SHOP_ID) return;
-    try {
-      setErr(null);
-      setLoadingHistory(true);
-      const res = await api.get(`/shop/${SHOP_ID}/history`, { headers });
-      const list = normalizeOrders(res?.data?.history ?? res?.data);
-      setHistory(list);
-    } catch (e) {
-      setErr(toErr(e, "โหลดประวัติไม่สำเร็จ"));
-      setHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [SHOP_ID, Auth?.token]);
+        setHistory(list);
+      } catch (e) {
+        setErr(toErr(e, "โหลดประวัติไม่สำเร็จ"));
+        setHistory([]);
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [SHOP_ID, Auth?.token]
+  );
 
   // โหลดตามมุมมอง
   useEffect(() => {
@@ -236,15 +280,20 @@ export default function OrderShop() {
     else fetchHistory();
   }, [SHOP_ID, view, fetchOrders, fetchHistory]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    const run = view === "orders" ? fetchOrders : fetchHistory;
-    if (!SHOP_ID) {
-      getShopId().finally(() => run().finally(() => setRefreshing(false)));
-    } else {
-      run().finally(() => setRefreshing(false));
-    }
-  }, [SHOP_ID, view, fetchOrders, fetchHistory, getShopId]);
+  const onRefresh = useCallback(
+    () => {
+      setRefreshing(true);
+      const run = view === "orders" ? fetchOrders : fetchHistory;
+      if (!SHOP_ID) {
+        getShopId().finally(() =>
+          run().finally(() => setRefreshing(false))
+        );
+      } else {
+        run().finally(() => setRefreshing(false));
+      }
+    },
+    [SHOP_ID, view, fetchOrders, fetchHistory, getShopId]
+  );
 
   /* ---------- actions: update status ---------- */
   const updateStatus = async (orderId, next) => {
@@ -259,15 +308,23 @@ export default function OrderShop() {
         await api.put(`/orders/${orderId}/status`, body, { headers });
       } catch {
         try {
-          await api.put(`/shops/${SHOP_ID}/orders/${orderId}/status`, body, { headers });
+          await api.put(
+            `/shops/${SHOP_ID}/orders/${orderId}/status`,
+            body,
+            { headers }
+          );
         } catch {
-          await api.put(`/shop/${SHOP_ID}/orders/${orderId}/status`, body, { headers });
+          await api.put(
+            `/shop/${SHOP_ID}/orders/${orderId}/status`,
+            body,
+            { headers }
+          );
         }
       }
 
       if (next === "completed") {
-        setView("history");     // สลับไปโหมดประวัติทันที
-        await fetchHistory();   // แล้วดึงประวัติ
+        setView("history"); // สลับไปโหมดประวัติทันที
+        await fetchHistory(); // แล้วดึงประวัติ
       } else {
         // อื่น ๆ อัปเดตลิสต์ปัจจุบันแบบ optimistic
         setOrders((prev) =>
@@ -289,7 +346,7 @@ export default function OrderShop() {
     const s = o.status;
     const busy = !!acting[o.id];
 
-    const Btn = ({ label, onPress }) => (
+    const BtnInline = ({ label, onPress }) => (
       <Pressable
         onPress={onPress}
         disabled={busy}
@@ -310,15 +367,21 @@ export default function OrderShop() {
 
     if (s === "prepare") {
       return (
-        <View style={{ flexDirection: "row" ,alignSelf:'center' }}>
-          <Btn label="พร้อมส่ง/รับ" onPress={() => updateStatus(o.id, "ready")} />
+        <View style={{ flexDirection: "row", alignSelf: "center" }}>
+          <BtnInline
+            label="พร้อมส่ง/รับ"
+            onPress={() => updateStatus(o.id, "ready")}
+          />
         </View>
       );
     }
     if (s === "ready") {
       return (
-        <View style={{ flexDirection: "row" ,alignSelf:'center' }}>
-          <Btn label="เสร็จสิ้น"  onPress={() => updateStatus(o.id, "completed")} />
+        <View style={{ flexDirection: "row", alignSelf: "center" }}>
+          <BtnInline
+            label="เสร็จสิ้น"
+            onPress={() => updateStatus(o.id, "completed")}
+          />
         </View>
       );
     }
@@ -327,6 +390,22 @@ export default function OrderShop() {
 
   const renderItem = ({ item: o }) => {
     const { bg, fg } = chipColor(o.status);
+
+    // 🧮 จำนวนชิ้น (ใช้ itemsCount เป็นหลัก)
+    const menuCount =
+      typeof o.itemsCount === "number"
+        ? o.itemsCount
+        : Array.isArray(o.itemNames)
+        ? o.itemNames.length
+        : 0;
+
+    // 🧾 ตัวอย่างชื่อเมนู
+    let menuPreview = "-";
+    if (Array.isArray(o.itemNames) && o.itemNames.length > 0) {
+      if (o.itemNames.length <= 3) menuPreview = o.itemNames.join(", ");
+      else menuPreview = `${o.itemNames.slice(0, 3).join(", ")} …`;
+    }
+
     return (
       <View
         style={{
@@ -379,19 +458,32 @@ export default function OrderShop() {
           </Text>
         </Text>
 
-        {/* summary */}
+        {/* summary: เมนู (X ชิ้น) + ยอดรวม */}
         <View
           style={{
+            marginTop: 8,
             flexDirection: "row",
             justifyContent: "space-between",
-            marginTop: 10,
-            alignItems: "center",
+            alignItems: "flex-start",
           }}
         >
-          <Text style={{ color: c.black }}>
-            รายการ: <Text style={{ fontWeight: "800" }}>{o.itemsCount}</Text>
+          <Text
+            style={{
+              color: c.black,
+              flex: 1,
+              marginRight: 8,
+            }}
+          >
+            เมนู ({menuCount} ชิ้น):{" "}
+            <Text style={{ fontWeight: "800" }}>{menuPreview}</Text>
           </Text>
-          <Text style={{ color: c.black, fontWeight: "900", fontSize: 16 }}>
+          <Text
+            style={{
+              color: c.black,
+              fontWeight: "900",
+              fontSize: 16,
+            }}
+          >
             {currencyTHB(o.total)}
           </Text>
         </View>
@@ -406,7 +498,7 @@ export default function OrderShop() {
     <View
       style={{
         flexDirection: "row",
-        justifyContent:'space-evenly',
+        justifyContent: "space-evenly",
         paddingHorizontal: 16,
         paddingTop: 10,
         paddingBottom: 6,
@@ -450,46 +542,87 @@ export default function OrderShop() {
   }, [orders]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.fullwhite }} edges={["top"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: c.fullwhite }}
+      edges={["top"]}
+    >
       <StatusBar style="dark" />
 
       {/* Header + toggle view */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 25, paddingBottom: 6 }}>
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: 25,
+          paddingBottom: 6,
+        }}
+      >
         <Text style={{ fontSize: 20, fontWeight: "900", color: c.black }}>
           {view === "orders" ? "ออเดอร์ร้าน" : "ประวัติออเดอร์"}
         </Text>
         <Text style={{ color: c.black, opacity: 0.7, marginTop: 2 }}>
           {view === "orders"
-            ? `${filter === "all" ? "ทุกรายการ" : `สถานะ: ${filter}`} • ${totals.count} ออเดอร์ • รวม ${currencyTHB(totals.sum)}`
+            ? `${
+                filter === "all" ? "ทุกรายการ" : `สถานะ: ${filter}`
+              } • ${totals.count} ออเดอร์ • รวม ${currencyTHB(totals.sum)}`
             : `รวม ${history.length} รายการ`}
         </Text>
 
-        <View style={{ flexDirection: "row", marginTop: 10  ,justifyContent:'space-evenly'}}>
+        <View
+          style={{
+            flexDirection: "row",
+            marginTop: 10,
+            justifyContent: "space-evenly",
+          }}
+        >
           <Pressable
-            onPress={() => { setView("orders"); fetchOrders(); }}
-            style={[Btn.Btn2,{
-              paddingHorizontal: 50,
-              paddingVertical: 6,
-              borderRadius: 8,
-              backgroundColor: view === "orders" ? c.S1 : c.fullwhite,
-              marginRight: 8,
-            }]}
+            onPress={() => {
+              setView("orders");
+              fetchOrders();
+            }}
+            style={[
+              Btn.Btn2,
+              {
+                paddingHorizontal: 50,
+                paddingVertical: 6,
+                borderRadius: 8,
+                backgroundColor:
+                  view === "orders" ? c.S1 : c.fullwhite,
+                marginRight: 8,
+              },
+            ]}
           >
-            <Text style={{ color: view === "orders" ? c.fullwhite : c.black, fontWeight: "800" }}>
+            <Text
+              style={{
+                color: view === "orders" ? c.fullwhite : c.black,
+                fontWeight: "800",
+              }}
+            >
               ออเดอร์
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => { setView("history"); fetchHistory(); }}
-            style={[Btn.Btn2,{
+            onPress={() => {
+              setView("history");
+              fetchHistory();
+            }}
+            style={[
+              Btn.Btn2,
+              {
                 paddingHorizontal: 50,
                 paddingVertical: 6,
                 borderRadius: 8,
-                backgroundColor: view === "history" ? c.S1 : c.fullwhite,
+                backgroundColor:
+                  view === "history" ? c.S1 : c.fullwhite,
                 marginRight: 8,
-            }]}
+              },
+            ]}
           >
-            <Text style={{ color: view === "history" ? c.fullwhite : c.black, fontWeight: "800" }}>
+            <Text
+              style={{
+                color: view === "history" ? c.fullwhite : c.black,
+                fontWeight: "800",
+              }}
+            >
               ประวัติ
             </Text>
           </Pressable>
@@ -502,21 +635,63 @@ export default function OrderShop() {
       {/* Lists */}
       {view === "orders" ? (
         loading ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <ActivityIndicator size="large" color={c.S1} />
-            <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
+            <Text
+              style={{
+                marginTop: 8,
+                color: c.black,
+                opacity: 0.7,
+              }}
+            >
               กำลังโหลดออเดอร์…
             </Text>
           </View>
         ) : err ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
-            {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
-            <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>{err.message}</Text>
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 24,
+            }}
+          >
+            {!!err.status && (
+              <Text style={{ color: c.red }}>HTTP {err.status}</Text>
+            )}
+            <Text
+              style={{
+                color: c.red,
+                marginTop: 4,
+                textAlign: "center",
+              }}
+            >
+              {err.message}
+            </Text>
             <Pressable
               onPress={fetchOrders}
-              style={{ marginTop: 12, backgroundColor: c.S2, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
+              style={{
+                marginTop: 12,
+                backgroundColor: c.S2,
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 10,
+              }}
             >
-              <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
+              <Text
+                style={{
+                  color: c.fullwhite,
+                  fontWeight: "800",
+                }}
+              >
+                ลองใหม่
+              </Text>
             </Pressable>
           </View>
         ) : (
@@ -524,43 +699,11 @@ export default function OrderShop() {
             data={orders}
             keyExtractor={(o, i) => String(o.id || i)}
             renderItem={renderItem}
-            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 100 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />
-            }
-            ListEmptyComponent={() => (
-              <View style={{ alignItems: "center", marginTop: 24 }}>
-                <Text style={{ color: c.black, opacity: 0.7 }}>ไม่มีออเดอร์ขณะนี้</Text>
-              </View>
-            )}
-          />
-        )
-      ) : (
-        // HISTORY VIEW
-        loadingHistory ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator size="large" color={c.S2} />
-            <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
-              กำลังโหลดประวัติ…
-            </Text>
-          </View>
-        ) : err ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
-            {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
-            <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>{err.message}</Text>
-            <Pressable
-              onPress={fetchHistory}
-              style={{ marginTop: 12, backgroundColor: c.S2, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
-            >
-              <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <FlatList
-            data={history}
-            keyExtractor={(o, i) => String(o.id || i)}
-            renderItem={renderItem}
-            contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 100 }}
+            contentContainerStyle={{
+              padding: 16,
+              paddingTop: 6,
+              paddingBottom: 100,
+            }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -569,12 +712,110 @@ export default function OrderShop() {
               />
             }
             ListEmptyComponent={() => (
-              <View style={{ alignItems: "center", marginTop: 24 }}>
-                <Text style={{ color: c.black, opacity: 0.7 }}>ยังไม่มีประวัติ</Text>
+              <View
+                style={{
+                  alignItems: "center",
+                  marginTop: 24,
+                }}
+              >
+                <Text style={{ color: c.black, opacity: 0.7 }}>
+                  ไม่มีออเดอร์ขณะนี้
+                </Text>
               </View>
             )}
           />
         )
+      ) : // HISTORY VIEW
+      loadingHistory ? (
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <ActivityIndicator size="large" color={c.S2} />
+          <Text
+            style={{
+              marginTop: 8,
+              color: c.black,
+              opacity: 0.7,
+            }}
+          >
+            กำลังโหลดประวัติ…
+          </Text>
+        </View>
+      ) : err ? (
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+          }}
+        >
+          {!!err.status && (
+            <Text style={{ color: c.red }}>HTTP {err.status}</Text>
+          )}
+          <Text
+            style={{
+              color: c.red,
+              marginTop: 4,
+              textAlign: "center",
+            }}
+          >
+            {err.message}
+          </Text>
+          <Pressable
+            onPress={fetchHistory}
+            style={{
+              marginTop: 12,
+              backgroundColor: c.S2,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: 10,
+            }}
+          >
+            <Text
+              style={{
+                color: c.fullwhite,
+                fontWeight: "800",
+              }}
+            >
+              ลองใหม่
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <FlatList
+          data={history}
+          keyExtractor={(o, i) => String(o.id || i)}
+          renderItem={renderItem}
+          contentContainerStyle={{
+            padding: 16,
+            paddingTop: 6,
+            paddingBottom: 100,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[c.S2]}
+            />
+          }
+          ListEmptyComponent={() => (
+            <View
+              style={{
+                alignItems: "center",
+                marginTop: 24,
+              }}
+            >
+              <Text style={{ color: c.black, opacity: 0.7 }}>
+                ยังไม่มีประวัติ
+              </Text>
+            </View>
+          )}
+        />
       )}
     </SafeAreaView>
   );

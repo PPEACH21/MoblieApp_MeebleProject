@@ -118,7 +118,7 @@ const TabStyle =({ state, descriptors, navigation }) => {
         if (route.name === "Home") iconName = isFocused ? "home-outline" : "home-outline";
         else if (route.name === "Orders") iconName = isFocused ? "receipt-outline" : "receipt-outline";
         else if (route.name === "Menu") iconName = isFocused ? "restaurant-outline" : "restaurant-outline";
-        else if (route.name === "Reserve") iconName = isFocused ? "calendar-outline" : "calendar-outline";
+        // else if (route.name === "Reserve") iconName = isFocused ? "calendar-outline" : "calendar-outline";
         else if (route.name === "Settings") iconName = isFocused ? "settings-outline" : "settings-outline";
 
         
@@ -176,12 +176,12 @@ export default function V_ButtonNav({ shopId, initialRouteName = "Home" }) {
         
       />
 
-      <Tab.Screen
+      {/* <Tab.Screen
         name="Reserve"
         component={ReserveShopScreen}
         initialParams={{ shopId: String(shopId || "") }}
         options={{ title: "การจอง" }}
-      />
+      /> */}
 
       <Tab.Screen
         name="Settings"
