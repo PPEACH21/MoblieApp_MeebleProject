@@ -275,8 +275,8 @@ const Splash = ({ navigation }) => {
             return setErrmsg(m.IncompleteInfo())
         }
         Dispath(loginUser({
-            username:logininput.Username,
-            email:logininput.Username,
+            username:logininput.Username.trim().toLowerCase(),
+            email:logininput.Username.trim().toLowerCase(),
             password:logininput.Password,
         }))
     }
@@ -297,8 +297,8 @@ const Splash = ({ navigation }) => {
         }
 
         Dispath(registerID({
-            email:registerinput.Email,
-            username:registerinput.Username,
+            email:registerinput.Email.trim().toLowerCase(),
+            username:registerinput.Username.trim().toLowerCase(),
             password:registerinput.Password,
             role:Rolesetup
         }))
