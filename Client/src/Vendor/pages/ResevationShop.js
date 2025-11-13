@@ -5,24 +5,14 @@ import {
   Text,
   FlatList,
   ActivityIndicator,
-  RefreshControl,
   Pressable,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { api } from "../../api/axios";
 import { BaseColor as c } from "../../components/Color";
-
-/* ---------- config ---------- */
-const SHOP_ID = "qIcsHxOuL5uAtW4TwAeV";
-
-/** ตัวเลือกกรองบน UI (ไม่มีสถานะแล้ว) */
-const FILTERS = [
-  { key: "today", label: "วันนี้" },
-  { key: "upcoming", label: "ถัดไป" },
-  { key: "past", label: "ผ่านมาแล้ว" },
-  { key: "all", label: "ทั้งหมด" },
-];
+import { useSelector } from "react-redux";
 
 /* ---------- helpers ---------- */
 const toErr = (e, fallback = "เกิดข้อผิดพลาด") => {
@@ -54,12 +44,7 @@ const fmtDateTime = (v) => {
   }).format(d);
 };
 
-const sameDay = (a, b) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
-
-/** ทำทรง reservation ให้สม่ำเสมอ (ไม่มี status แล้ว) */
+/** ทำทรง reservation ให้สม่ำเสมอ (ไม่สน status แล้ว) */
 const normalizeReservations = (data) => {
   let list = [];
   if (!data) return list;
@@ -70,13 +55,28 @@ const normalizeReservations = (data) => {
 
   return (list || []).map((r, i) => {
     const id = r.id || r.ID || r.reservation_id || String(i);
-    const start = r.startAt || r.start_at || r.datetime || r.date || r.reserve_time;
+    const start =
+      r.startAt ||
+      r.start_at ||
+      r.datetime ||
+      r.date ||
+      r.reserve_time ||
+      r.dayKey ||
+      r.createdAt;
 
     return {
       id,
       startAt: start,
       people:
-        Number(r.people ?? r.party_size ?? r.guests ?? r.qty ?? r.count ?? r.pax ?? 1) || 1,
+        Number(
+          r.people ??
+            r.party_size ??
+            r.guests ??
+            r.qty ??
+            r.count ??
+            r.pax ??
+            1
+        ) || 1,
       user_id: r.user_id || r.userId || r.customer_id || "-",
       phone: r.phone || r.customerPhone || r.customer_phone || "",
       note: r.note || r.notes || r.remark || "",
@@ -85,45 +85,79 @@ const normalizeReservations = (data) => {
   });
 };
 
-/* ---------- main ---------- */
+/* ---------- main component ---------- */
 export default function ReserveShop() {
-  const [filter, setFilter] = useState("today");
+  const Auth = useSelector((state) => state.auth);
+
+  const [shopId, setShopId] = useState(null);
   const [resv, setResv] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);      // โหลดครั้งแรก
+  const [refreshing, setRefreshing] = useState(false); // pull-to-refresh
   const [err, setErr] = useState(null);
 
+  // memo header กัน object ใหม่ทุก render (กัน useEffect ลูป)
+  const headers = useMemo(
+    () =>
+      Auth?.token
+        ? { Authorization: `Bearer ${Auth.token}` }
+        : undefined,
+    [Auth?.token]
+  );
+
+  /* ---------- ดึง shopId จาก vendor (Auth.user) ---------- */
+  const fetchShopId = useCallback(async () => {
+    try {
+      if (!Auth?.user) return;
+      const { data } = await api.get(`/shop/by-id/${Auth.user}`, {
+        headers,
+      });
+      const id =
+        data?.id ||
+        data?.shopId ||
+        data?.shop_id ||
+        data?.shop?.id ||
+        data?.shop?.shopId ||
+        null;
+      setShopId(id);
+      console.log("[ReserveShop] shopId =", id);
+    } catch (e) {
+      console.log("[ReserveShop] get shop by vendor failed:", e?.message);
+      setShopId(null);
+    }
+  }, [Auth?.user, headers]);
+
+  useEffect(() => {
+    fetchShopId();
+  }, [fetchShopId]);
+
+  /* ---------- ดึงรายการจอง ---------- */
   const fetchReservations = useCallback(async () => {
-    if (!SHOP_ID) return;
+    if (!shopId) return;
     try {
       setErr(null);
       setLoading(true);
 
       let res;
       try {
-        res = await api.get(`/shops/${SHOP_ID}/reservations`, {
-          withCredentials: true,
-          headers: { "Cache-Control": "no-cache" },
+        // ตาม route ที่มี: /shops/:id/reservations
+        res = await api.get(`/shops/${shopId}/reservations`, {
+          headers: { "Cache-Control": "no-cache", ...headers },
         });
       } catch (e1) {
         if (e1?.response?.status === 404) {
           setResv([]);
           setErr(null);
-          setLoading(false);
-          setRefreshing(false);
           return;
         }
+        // fallback: /shop/:id/reservations
         try {
-          res = await api.get(`/shop/${SHOP_ID}/reservations`, {
-            withCredentials: true,
-            headers: { "Cache-Control": "no-cache" },
+          res = await api.get(`/shop/${shopId}/reservations`, {
+            headers: { "Cache-Control": "no-cache", ...headers },
           });
         } catch (e2) {
           if (e2?.response?.status === 404) {
             setResv([]);
             setErr(null);
-            setLoading(false);
-            setRefreshing(false);
             return;
           }
           throw e2;
@@ -132,91 +166,34 @@ export default function ReserveShop() {
 
       const list = normalizeReservations(res?.data);
 
-      // กรองตามแท็บเวลา
-      const now = new Date();
-      const todayList = [];
-      const upcomingList = [];
-      const pastList = [];
-
-      for (const r of list) {
-        const start = toDate(r.startAt);
-        if (!start) continue;
-        if (sameDay(start, now)) todayList.push(r);
-        else if (start > now) upcomingList.push(r);
-        else pastList.push(r);
-      }
-
-      let finalList = list;
-      if (filter === "today") finalList = todayList;
-      else if (filter === "upcoming") finalList = upcomingList;
-      else if (filter === "past") finalList = pastList;
-
-      finalList.sort((a, b) => {
-        const da = +toDate(a.startAt) || 0;
-        const db = +toDate(b.startAt) || 0;
-        return da - db;
+      // 🔁 sort ทั้งหมดตามเวลา (startAt > createdAt)
+      const sorted = [...list].sort((a, b) => {
+        const da = +toDate(a.startAt || a.createdAt) || 0;
+        const db = +toDate(b.startAt || b.createdAt) || 0;
+        return da - db; // เก่าสุด → ใหม่สุด (ถ้าอยากให้ใหม่สุดอยู่บน เปลี่ยนเป็น db - da)
       });
 
-      setResv(finalList);
+      setResv(sorted);
     } catch (e) {
       setErr(toErr(e, "โหลดรายการจองไม่สำเร็จ"));
       setResv([]);
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      // ❌ ไม่ไปยุ่งกับ refreshing ตรงนี้ ปล่อยให้ onRefresh จัดการเอง
     }
-  }, [filter]);
+  }, [shopId, headers]);
 
+  // โหลดรายการจองเมื่อรู้ shopId แล้ว
   useEffect(() => {
+    if (!shopId) return;
     fetchReservations();
-  }, [fetchReservations]);
+  }, [shopId, fetchReservations]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchReservations();
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);          // spinner ด้านบนเริ่มหมุน
+    await fetchReservations();    // ใช้ฟังก์ชันเดียวกัน
+    setRefreshing(false);         // ดับ spinner
   }, [fetchReservations]);
-
-  /* ---------- UI blocks ---------- */
-  const Tabs = () => (
-    <View
-       style={{
-        flexDirection: "row",
-        justifyContent:'space-evenly',
-        paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 6,
-        gap: 8,
-      }}
-    >
-      {FILTERS.map((f) => {
-        const active = filter === f.key;
-        return (
-          <Pressable
-            key={f.key}
-            onPress={() => setFilter(f.key)}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 10,
-              backgroundColor: active ? c.S1 : c.S4,
-              borderWidth: active ? 0 : 1,
-              borderColor: c.S3,
-            }}
-          >
-            <Text
-              style={{
-                color: active ? c.fullwhite : c.black,
-                fontWeight: "800",
-                fontSize: 12,
-              }}
-            >
-              {f.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
 
   const renderItem = ({ item: r }) => (
     <View
@@ -226,7 +203,7 @@ export default function ReserveShop() {
         borderRadius: 14,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: c.S3, // เส้นขอบส้มอ่อน
+        borderColor: c.S3,
       }}
     >
       {/* header */}
@@ -236,7 +213,7 @@ export default function ReserveShop() {
 
       {/* meta */}
       <Text style={{ marginTop: 6, color: c.black, opacity: 0.7 }}>
-        ผู้จอง:{" "}
+        ผู้จอง (userId):{" "}
         <Text style={{ color: c.black, fontWeight: "700" }}>
           {r.user_id || "-"}
         </Text>
@@ -245,7 +222,7 @@ export default function ReserveShop() {
       <Text style={{ marginTop: 2, color: c.black, opacity: 0.7 }}>
         เวลา:{" "}
         <Text style={{ color: c.black, fontWeight: "700" }}>
-          {fmtDateTime(r.startAt)}
+          {fmtDateTime(r.startAt || r.createdAt)}
         </Text>
       </Text>
 
@@ -260,43 +237,59 @@ export default function ReserveShop() {
         </Text>
       )}
       {!!r.note && (
-        <Text style={{ marginTop: 6, color: c.black }}>หมายเหตุ: {r.note}</Text>
+        <Text style={{ marginTop: 6, color: c.black }}>
+          หมายเหตุ: {r.note}
+        </Text>
       )}
     </View>
   );
 
   const totals = useMemo(() => {
     const count = resv.length;
-    const people = resv.reduce((acc, r) => acc + (Number(r.people) || 0), 0);
+    const people = resv.reduce(
+      (acc, r) => acc + (Number(r.people) || 0),
+      0
+    );
     return { count, people };
   }, [resv]);
 
   /* ---------- render ---------- */
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.fullwhite }} edges={["top"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: c.fullwhite }}
+      edges={["top"]}
+    >
       <StatusBar style="dark" />
+
       {/* header */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
         <Text style={{ fontSize: 20, fontWeight: "900", color: c.black }}>
           รายการจองเข้าร้าน
         </Text>
         <Text style={{ color: c.black, opacity: 0.7, marginTop: 2 }}>
-          {filter === "all"
-            ? "ทั้งหมด"
-            : filter === "today"
-            ? "วันนี้"
-            : filter === "upcoming"
-            ? "ถัดไป"
-            : "ที่ผ่านมาแล้ว"}
-          {" • "}
-          {totals.count} รายการ • {totals.people} คน
+          ทั้งหมด • {totals.count} รายการ • {totals.people} คน
         </Text>
       </View>
 
-      <Tabs />
-
-      {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+      {/* ถ้า shopId ยังไม่รู้เลย */}
+      {!shopId && loading ? (
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
+          <ActivityIndicator size="large" color={c.S2} />
+          <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
+            กำลังเตรียมข้อมูลร้าน…
+          </Text>
+        </View>
+      ) : loading && !refreshing ? (
+        // โหลดครั้งแรก (มี shopId แล้ว แต่ยังดึง reservations อยู่)
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <ActivityIndicator size="large" color={c.S2} />
           <Text style={{ marginTop: 8, color: c.black, opacity: 0.7 }}>
             กำลังโหลดรายการจอง…
@@ -311,8 +304,16 @@ export default function ReserveShop() {
             paddingHorizontal: 24,
           }}
         >
-          {!!err.status && <Text style={{ color: c.red }}>HTTP {err.status}</Text>}
-          <Text style={{ color: c.red, marginTop: 4, textAlign: "center" }}>
+          {!!err.status && (
+            <Text style={{ color: c.red }}>HTTP {err.status}</Text>
+          )}
+          <Text
+            style={{
+              color: c.red,
+              marginTop: 4,
+              textAlign: "center",
+            }}
+          >
             {err.message}
           </Text>
           <Pressable
@@ -325,7 +326,9 @@ export default function ReserveShop() {
               borderRadius: 10,
             }}
           >
-            <Text style={{ color: c.fullwhite, fontWeight: "800" }}>ลองใหม่</Text>
+            <Text style={{ color: c.fullwhite, fontWeight: "800" }}>
+              ลองใหม่
+            </Text>
           </Pressable>
         </View>
       ) : (
@@ -339,11 +342,17 @@ export default function ReserveShop() {
             paddingBottom: 20,
           }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[c.S2]} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[c.S2]}
+            />
           }
           ListEmptyComponent={() => (
             <View style={{ alignItems: "center", marginTop: 24 }}>
-              <Text style={{ color: c.black, opacity: 0.7 }}>ยังไม่มีการจองขณะนี้</Text>
+              <Text style={{ color: c.black, opacity: 0.7 }}>
+                ยังไม่มีการจองขณะนี้
+              </Text>
             </View>
           )}
         />

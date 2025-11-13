@@ -114,7 +114,7 @@ const TabStyle =({ state, descriptors, navigation }) => {
         let iconName = "home-outline";
         if (route.name === "Home")iconName = isFocused ? "home-outline" : "home-outline";
         else if (route.name === "Orders")iconName = isFocused ? "receipt-outline" : "receipt-outline";
-        // else if (route.name === "Reservations")iconName = isFocused ? "calendar-outline" : "calendar-outline";
+        else if (route.name === "Reservations")iconName = isFocused ? "calendar-outline" : "calendar-outline";
         else if (route.name === "Settings")iconName = isFocused ? "settings-outline" : "settings-outline";
 
         return (

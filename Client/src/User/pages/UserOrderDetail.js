@@ -9,12 +9,12 @@ import {
   Image,
   Pressable,
   ScrollView,
-  Platform,
+  // Platform, // ไม่จำเป็นแล้ว
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { api } from "../../api/axios";
-import DateTimePicker from "@react-native-community/datetimepicker";
+// import DateTimePicker from "@react-native-community/datetimepicker"; // ไม่จำเป็นแล้ว
 import { m } from "../../paraglide/messages";
 
 const fmtTHB = (n) =>
@@ -44,24 +44,24 @@ const fmtDate = (v) => {
   }
 };
 
-const fmtDateOnly = (v) => {
-  try {
-    const d =
-      typeof v === "object" && v?.seconds
-        ? new Date(v.seconds * 1000)
-        : v instanceof Date
-        ? v
-        : new Date(v);
-    if (isNaN(d.getTime())) return "-";
-    return d.toLocaleDateString("th-TH", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-    });
-  } catch {
-    return "-";
-  }
-};
+// const fmtDateOnly = (v) => { // ไม่จำเป็นแล้ว
+//   try {
+//     const d =
+//       typeof v === "object" && v?.seconds
+//         ? new Date(v.seconds * 1000)
+//         : v instanceof Date
+//         ? v
+//         : new Date(v);
+//     if (isNaN(d.getTime())) return "-";
+//     return d.toLocaleDateString("th-TH", {
+//       year: "numeric",
+//       month: "short",
+//       day: "2-digit",
+//     });
+//   } catch {
+//     return "-";
+//   }
+// };
 
 const StatusPill = ({ status }) => {
   const map = {
@@ -89,20 +89,18 @@ const StatusPill = ({ status }) => {
 export default function UserOrderDetail() {
   const route = useRoute();
   const nav = useNavigation();
-  const Auth = useSelector((s) => s.auth);
+  // const Auth = useSelector((s) => s.auth); // ไม่ได้ใช้
   const orderId = String(route?.params?.orderId || "").trim();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState(null);
-
-  // 👥 จำนวนคน
-  const [people, setPeople] = useState(1);
-
-  // 📅 วันที่จอง
-  const [reserveDate, setReserveDate] = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // ลบ state ที่เกี่ยวข้องกับการจองออก
+  // const [people, setPeople] = useState(1);
+  // const [reserveDate, setReserveDate] = useState(null);
+  // const [showDatePicker, setShowDatePicker] = useState(false);
 
   const canCancel = useMemo(() => {
     const s = String(order?.status || "").toLowerCase();
@@ -158,8 +156,9 @@ export default function UserOrderDetail() {
       };
 
       setOrder(mapped);
-      setPeople(mapped.people || 1);
-      setReserveDate(mapped.reserveDate ? mapped.reserveDate : null);
+      // ลบการตั้งค่า state ที่เกี่ยวข้องกับการจองออก
+      // setPeople(mapped.people || 1);
+      // setReserveDate(mapped.reserveDate ? mapped.reserveDate : null);
     } catch (e) {
       setErr(e?.response?.data?.error || e?.message || m.Failedorders());
     } finally {
@@ -177,35 +176,31 @@ export default function UserOrderDetail() {
     setRefreshing(false);
   }, [fetchOrder]);
 
-  // 👥 เปลี่ยนจำนวนคน
-  const changePeople = (delta) => {
-    setPeople((prev) => {
-      const next = Math.max(1, (Number(prev) || 1) + delta);
-      setOrder((o) => (o ? { ...o, people: next } : o));
-      return next;
-    });
-  };
+  // ลบฟังก์ชันที่เกี่ยวข้องกับการจองออก
+  // const changePeople = (delta) => {
+  //   setPeople((prev) => {
+  //     const next = Math.max(1, (Number(prev) || 1) + delta);
+  //     setOrder((o) => (o ? { ...o, people: next } : o));
+  //     return next;
+  //   });
+  // };
 
-  // 📅 เปลี่ยนวันที่ + ปิด picker ทันทีหลังเลือก
-  const onChangeReserveDate = (event, date) => {
-    // ปิด picker เสมอ ทั้ง iOS/Android
-    setShowDatePicker(false);
+  // const onChangeReserveDate = (event, date) => {
+  //   setShowDatePicker(false);
+  //   if (date) {
+  //     setReserveDate(date);
+  //     setOrder((o) => (o ? { ...o, reserveDate: date } : o));
+  //   }
+  // };
 
-    // ถ้า user เลือกวัน (ไม่ใช่ dismissed)
-    if (date) {
-      setReserveDate(date);
-      setOrder((o) => (o ? { ...o, reserveDate: date } : o));
-    }
-  };
-
-  const getReserveDateValue = () => {
-    if (!reserveDate) return new Date();
-    if (reserveDate instanceof Date) return reserveDate;
-    if (typeof reserveDate === "object" && reserveDate?.seconds) {
-      return new Date(reserveDate.seconds * 1000);
-    }
-    return new Date(reserveDate);
-  };
+  // const getReserveDateValue = () => {
+  //   if (!reserveDate) return new Date();
+  //   if (reserveDate instanceof Date) return reserveDate;
+  //   if (typeof reserveDate === "object" && reserveDate?.seconds) {
+  //     return new Date(reserveDate.seconds * 1000);
+  //   }
+  //   return new Date(reserveDate);
+  // };
 
   if (loading) {
     return (
@@ -336,131 +331,34 @@ export default function UserOrderDetail() {
           </View>
         )}
 
-        {/* 👥 จำนวนคน + 📅 วันที่จอง */}
-        <View
-          style={{
-            marginTop: 16,
-            padding: 12,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: "#e5e7eb",
-            backgroundColor: "#f9fafb",
-            gap: 12,
-          }}
-        >
-          {/* จำนวนคน */}
+        {/* // ลบส่วนที่เกี่ยวข้องกับการจอง (จำนวนคน + วันที่จอง) ออก
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
+              marginTop: 16,
+              padding: 12,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: "#e5e7eb",
+              backgroundColor: "#f9fafb",
+              gap: 12,
             }}
           >
-            <Text
-              style={{
-                fontWeight: "700",
-                color: "#0f172a",
-              }}
-            >
-              จำนวนคน
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Pressable
-                onPress={() => changePeople(-1)}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: "#e5e7eb",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: "#ffffff",
-                }}
-              >
-                <Text style={{ fontSize: 18, fontWeight: "800" }}>−</Text>
-              </Pressable>
-              <Text
-                style={{
-                  minWidth: 36,
-                  textAlign: "center",
-                  fontWeight: "800",
-                  color: "#0f172a",
-                }}
-              >
-                {people}
-              </Text>
-              <Pressable
-                onPress={() => changePeople(1)}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: "#e5e7eb",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: "#ffffff",
-                }}
-              >
-                <Text style={{ fontSize: 18, fontWeight: "800" }}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* วันที่จอง */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text
-              style={{
-                fontWeight: "700",
-                color: "#0f172a",
-              }}
-            >
-              วันที่จอง
-            </Text>
-            <Pressable
-              onPress={() => setShowDatePicker((prev) => !prev)}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: "#e5e7eb",
-                backgroundColor: "#ffffff",
-              }}
-            >
-              <Text style={{ color: "#0f172a", fontWeight: "600" }}>
-                {reserveDate ? fmtDateOnly(reserveDate) : "เลือกวันที่"}
-              </Text>
-            </Pressable>
-          </View>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={getReserveDateValue()}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={onChangeReserveDate}
-            />
-          )}
-        </View>
+            ... ส่วนของจำนวนคนและวันที่จอง ...
+            {showDatePicker && (
+              <DateTimePicker
+                value={getReserveDateValue()}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={onChangeReserveDate}
+              />
+            )}
+          </View> 
+        */}
 
         {/* รายการสินค้า */}
         <View
           style={{
-            marginTop: 16,
+            marginTop: 16, // ปรับ marginTop ให้เป็น 16 เพื่อเว้นจาก Note/Header
             borderWidth: 1,
             borderColor: "#e5e7eb",
             borderRadius: 12,

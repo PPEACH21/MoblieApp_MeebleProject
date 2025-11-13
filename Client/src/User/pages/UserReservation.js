@@ -1,4 +1,3 @@
-// src/User/pages/UserReserveScreen.jsx
 import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
@@ -44,11 +43,12 @@ const StatusPill = ({ status }) => {
   };
 
   const key = String(status || "").toLowerCase();
-  const sty = map[key] || {
-    bg: "#e5e7eb",
-    fg: "#374151",
-    label: status || "ไม่ระบุ",
-  };
+  const sty =
+    map[key] || {
+      bg: "#e5e7eb",
+      fg: "#374151",
+      label: status || "ไม่ระบุ",
+    };
 
   return (
     <View
@@ -75,9 +75,9 @@ const normalizeReservation = (raw) => ({
 
   user_id: raw.user_id || raw.userId || "",
 
-  people: Number(raw.people || 1),
+  people: Number(raw.people || 1) || 1,
 
-  // Firestore ไม่ส่ง date → ใช้ createdAt แทน
+  // Firestore ไม่ส่ง date → ใช้ createdAt / dayKey สำรอง
   date:
     raw.date ||
     raw.reserveDate ||
@@ -105,6 +105,7 @@ export default function UserReserveScreen() {
   const fetchReserves = useCallback(async () => {
     try {
       setErr(null);
+      setLoading(true);
 
       const userId = Auth.user;
       if (!userId) {
@@ -112,9 +113,8 @@ export default function UserReserveScreen() {
         return;
       }
 
-      const res = await api.get("/reservations/user", {
-        params: { userId },
-      });
+      // ดึงข้อมูลจาก BE: GET /users/:userId/reservations
+      const res = await api.get(`/users/${userId}/reservations`);
 
       const data = res?.data;
       const list = Array.isArray(data?.items)
@@ -123,11 +123,42 @@ export default function UserReserveScreen() {
         ? data
         : [];
 
-      const normalized = list
+      // แปลง field ให้เป็นรูปเดียวกันก่อน
+      const base = list
         .map(normalizeReservation)
         .filter((x) => x.id);
 
-      // sort โดยใช้ createdAt
+      // ---------- ดึงชื่อร้านจาก shop_id ทั้งหมด ----------
+      const shopIds = Array.from(
+        new Set(base.map((x) => x.shop_id).filter(Boolean))
+      );
+
+      const shopNameMap = {};
+      await Promise.all(
+        shopIds.map(async (sid) => {
+          try {
+            const r = await api.get(`/shop/${sid}`);
+            const name =
+              r?.data?.shop?.name ||
+              r?.data?.name ||
+              r?.data?.shop_name ||
+              "ไม่ระบุชื่อร้าน";
+            shopNameMap[sid] = name;
+          } catch (e) {
+            console.log("โหลดชื่อร้านไม่สำเร็จ shopId =", sid, e?.message);
+            shopNameMap[sid] = "ไม่ระบุชื่อร้าน";
+          }
+        })
+      );
+
+      // เอาชื่อร้านใส่กลับเข้าไปในรายการจอง
+      const normalized = base.map((rsv) => ({
+        ...rsv,
+        shop_name:
+          shopNameMap[rsv.shop_id] || rsv.shop_name || "ไม่ระบุชื่อร้าน",
+      }));
+
+      // ---------- sort จากใหม่ → เก่า ----------
       normalized.sort((a, b) => {
         const da = a.createdAt?.seconds
           ? a.createdAt.seconds * 1000
@@ -142,6 +173,7 @@ export default function UserReserveScreen() {
 
       setReserves(normalized);
     } catch (e) {
+      console.log("โหลดข้อมูลการจองไม่สำเร็จ", e?.message || e);
       setErr(
         e?.response?.data?.error ||
           e?.message ||
@@ -150,6 +182,7 @@ export default function UserReserveScreen() {
       setReserves([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [Auth.user]);
 
