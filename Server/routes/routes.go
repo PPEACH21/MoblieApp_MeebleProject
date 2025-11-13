@@ -41,6 +41,7 @@ func Routes(app *fiber.App) {
 	/* ---------- RESERVATIONS ---------- */
 	app.Post("/shops/:id/reservations", controllers.CreateReservation)
 	app.Get("/shops/:id/reservations", controllers.ListReservationsByShop)
+	app.Get("/reservations/user", controllers.GetUserReservations)
 	/* ---------- CART ---------- */
 	app.Get("/cart", controllers.GetCart)
 	app.Post("/cart/add", controllers.AddToCart)

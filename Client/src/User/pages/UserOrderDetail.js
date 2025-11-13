@@ -8,12 +8,13 @@ import {
   FlatList,
   Image,
   Pressable,
-  Alert,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { api } from "../../api/axios";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { m } from "../../paraglide/messages";
 
 const fmtTHB = (n) =>
@@ -27,7 +28,9 @@ const fmtTHB = (n) =>
 const fmtDate = (v) => {
   try {
     const d =
-      typeof v === "object" && v?.seconds ? new Date(v.seconds * 1000) : new Date(v);
+      typeof v === "object" && v?.seconds
+        ? new Date(v.seconds * 1000)
+        : new Date(v);
     if (isNaN(d.getTime())) return "-";
     return d.toLocaleString("th-TH", {
       year: "numeric",
@@ -41,6 +44,25 @@ const fmtDate = (v) => {
   }
 };
 
+const fmtDateOnly = (v) => {
+  try {
+    const d =
+      typeof v === "object" && v?.seconds
+        ? new Date(v.seconds * 1000)
+        : v instanceof Date
+        ? v
+        : new Date(v);
+    if (isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    });
+  } catch {
+    return "-";
+  }
+};
+
 const StatusPill = ({ status }) => {
   const map = {
     prepare: { bg: "#fff7ed", fg: "#9a3412", label:m.processing() },
@@ -48,7 +70,8 @@ const StatusPill = ({ status }) => {
     completed: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
     canceled: { bg: "#fee2e2", fg: "#991b1b", label: m.cancel() },
   };
-  const sty = map[status] || { bg: "#eef2ff", fg: "#3730a3", label: status || "-" };
+  const sty =
+    map[status] || { bg: "#eef2ff", fg: "#3730a3", label: status || "-" };
   return (
     <View
       style={{
@@ -74,6 +97,13 @@ export default function UserOrderDetail() {
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState(null);
 
+  // 👥 จำนวนคน
+  const [people, setPeople] = useState(1);
+
+  // 📅 วันที่จอง
+  const [reserveDate, setReserveDate] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const canCancel = useMemo(() => {
     const s = String(order?.status || "").toLowerCase();
     return s === "prepare";
@@ -88,18 +118,35 @@ export default function UserOrderDetail() {
       if (!res?.data || res?.status === 404) {
         res = await api.get(`/order/${orderId}`);
       }
+
       const raw = res?.data?.order || res?.data || {};
       const items = Array.isArray(raw.items) ? raw.items : [];
-      setOrder({
+
+      const mapped = {
         id: raw.id || raw.ID || orderId,
         shop_name: raw.shop_name || raw.ShopName || "-",
         shop_id: raw.shop_id || raw.shopId || "",
         customer_id: raw.customer_id || raw.customerId || "",
         status: raw.status || "-",
         note: raw.note || "",
-        total: Number(raw.total) || items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.qty) || 0), 0),
+        total:
+          Number(raw.total) ||
+          items.reduce(
+            (s, it) => s + (Number(it.price) || 0) * (Number(it.qty) || 0),
+            0
+          ),
         createdAt: raw.createdAt || raw.created_at || raw.timestamp || null,
         updatedAt: raw.updatedAt || raw.updated_at || null,
+        people:
+          Number(
+            raw.people || raw.People || raw.people_count || raw.PeopleCount || 1
+          ) || 1,
+        reserveDate:
+          raw.reserveDate ||
+          raw.reserved_at ||
+          raw.reservedDate ||
+          raw.date ||
+          null,
         items: items.map((it, i) => ({
           id: it.id || it.menuId || String(i),
           name: it.name || "-",
@@ -108,7 +155,11 @@ export default function UserOrderDetail() {
           image: it.image || "",
           description: it.description || "",
         })),
-      });
+      };
+
+      setOrder(mapped);
+      setPeople(mapped.people || 1);
+      setReserveDate(mapped.reserveDate ? mapped.reserveDate : null);
     } catch (e) {
       setErr(e?.response?.data?.error || e?.message || m.Failedorders());
     } finally {
@@ -126,6 +177,35 @@ export default function UserOrderDetail() {
     setRefreshing(false);
   }, [fetchOrder]);
 
+  // 👥 เปลี่ยนจำนวนคน
+  const changePeople = (delta) => {
+    setPeople((prev) => {
+      const next = Math.max(1, (Number(prev) || 1) + delta);
+      setOrder((o) => (o ? { ...o, people: next } : o));
+      return next;
+    });
+  };
+
+  // 📅 เปลี่ยนวันที่ + ปิด picker ทันทีหลังเลือก
+  const onChangeReserveDate = (event, date) => {
+    // ปิด picker เสมอ ทั้ง iOS/Android
+    setShowDatePicker(false);
+
+    // ถ้า user เลือกวัน (ไม่ใช่ dismissed)
+    if (date) {
+      setReserveDate(date);
+      setOrder((o) => (o ? { ...o, reserveDate: date } : o));
+    }
+  };
+
+  const getReserveDateValue = () => {
+    if (!reserveDate) return new Date();
+    if (reserveDate instanceof Date) return reserveDate;
+    if (typeof reserveDate === "object" && reserveDate?.seconds) {
+      return new Date(reserveDate.seconds * 1000);
+    }
+    return new Date(reserveDate);
+  };
 
   if (loading) {
     return (
@@ -144,7 +224,12 @@ export default function UserOrderDetail() {
         </Text>
         <Pressable
           onPress={fetchOrder}
-          style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: "#2563eb" }}
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 12,
+            backgroundColor: "#2563eb",
+          }}
         >
           <Text style={{ color: "white", fontWeight: "800" }}>{m.tryagain()}</Text>
         </Pressable>
@@ -176,7 +261,12 @@ export default function UserOrderDetail() {
             ? item.image
             : "https://via.placeholder.com/80x80.png?text=%20",
         }}
-        style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: "#f1f5f9" }}
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 10,
+          backgroundColor: "#f1f5f9",
+        }}
       />
       <View style={{ flex: 1 }}>
         <Text style={{ fontWeight: "800", color: "#0f172a" }} numberOfLines={1}>
@@ -187,10 +277,14 @@ export default function UserOrderDetail() {
             {item.description}
           </Text>
         )}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
-          <Text style={{ color: "#334155" }}>
-            x{item.qty}
-          </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginTop: 6,
+          }}
+        >
+          <Text style={{ color: "#334155" }}>x{item.qty}</Text>
           <Text style={{ fontWeight: "800", color: "#111827" }}>
             {fmtTHB((Number(item.qty) || 0) * (Number(item.price) || 0))}
           </Text>
@@ -202,10 +296,19 @@ export default function UserOrderDetail() {
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         contentContainerStyle={{ padding: 16 }}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        {/* header order info */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={{ fontSize: 18, fontWeight: "800", color: "#0f172a" }} numberOfLines={1}>
               {order.shop_name || m.Orders}
@@ -216,6 +319,7 @@ export default function UserOrderDetail() {
           <StatusPill status={order.status} />
         </View>
 
+        {/* หมายเหตุ */}
         {!!order.note && (
           <View
             style={{
@@ -232,7 +336,136 @@ export default function UserOrderDetail() {
           </View>
         )}
 
-        <View style={{ marginTop: 16, borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12 }}>
+        {/* 👥 จำนวนคน + 📅 วันที่จอง */}
+        <View
+          style={{
+            marginTop: 16,
+            padding: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: "#e5e7eb",
+            backgroundColor: "#f9fafb",
+            gap: 12,
+          }}
+        >
+          {/* จำนวนคน */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text
+              style={{
+                fontWeight: "700",
+                color: "#0f172a",
+              }}
+            >
+              จำนวนคน
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Pressable
+                onPress={() => changePeople(-1)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: "#e5e7eb",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "#ffffff",
+                }}
+              >
+                <Text style={{ fontSize: 18, fontWeight: "800" }}>−</Text>
+              </Pressable>
+              <Text
+                style={{
+                  minWidth: 36,
+                  textAlign: "center",
+                  fontWeight: "800",
+                  color: "#0f172a",
+                }}
+              >
+                {people}
+              </Text>
+              <Pressable
+                onPress={() => changePeople(1)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: "#e5e7eb",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "#ffffff",
+                }}
+              >
+                <Text style={{ fontSize: 18, fontWeight: "800" }}>+</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* วันที่จอง */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text
+              style={{
+                fontWeight: "700",
+                color: "#0f172a",
+              }}
+            >
+              วันที่จอง
+            </Text>
+            <Pressable
+              onPress={() => setShowDatePicker((prev) => !prev)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: "#e5e7eb",
+                backgroundColor: "#ffffff",
+              }}
+            >
+              <Text style={{ color: "#0f172a", fontWeight: "600" }}>
+                {reserveDate ? fmtDateOnly(reserveDate) : "เลือกวันที่"}
+              </Text>
+            </Pressable>
+          </View>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={getReserveDateValue()}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onChange={onChangeReserveDate}
+            />
+          )}
+        </View>
+
+        {/* รายการสินค้า */}
+        <View
+          style={{
+            marginTop: 16,
+            borderWidth: 1,
+            borderColor: "#e5e7eb",
+            borderRadius: 12,
+          }}
+        >
           <FlatList
             data={order.items || []}
             keyExtractor={(it, i) => String(it.id ?? i)}
@@ -247,6 +480,7 @@ export default function UserOrderDetail() {
           />
         </View>
 
+        {/* ยอดรวม */}
         <View
           style={{
             marginTop: 16,
@@ -264,6 +498,7 @@ export default function UserOrderDetail() {
           </Text>
         </View>
 
+        {/* ปุ่มกลับ */}
         <View style={{ marginTop: 12, flexDirection: "row", gap: 10 }}>
           <Pressable
             onPress={() => nav.goBack()}

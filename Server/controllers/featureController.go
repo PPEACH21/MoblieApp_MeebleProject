@@ -479,7 +479,7 @@ func CreateReservation(c *fiber.Ctx) error {
 		body.People = 1
 	}
 
-	col := config.Client.Collection(models.ColReservations)
+	col := config.Client.Collection(models.ColReservations) // เช่น "reservations"
 	doc := col.NewDoc()
 
 	resv := models.Reservation{
@@ -491,9 +491,26 @@ func CreateReservation(c *fiber.Ctx) error {
 		CreatedAt: now(),
 	}
 
+	// ✅ เขียนลง collection หลักก่อน
 	if _, err := doc.Set(config.Ctx, resv); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create reservation",
+			"msg":   err.Error(),
+		})
+	}
+
+	// ✅ เขียนซ้ำไปเก็บใต้ user ด้วย
+	// ถ้ามี constant ชื่อ ColUsers ก็ใช้ models.ColUsers แทน "users"
+	userResvDoc := config.Client.
+		Collection("users").
+		Doc(body.UserID).
+		Collection("reservations").
+		Doc(doc.ID)
+
+	if _, err := userResvDoc.Set(config.Ctx, resv); err != nil {
+		// แล้วแต่ดีไซน์ ว่าจะถือว่า error เลย หรือแค่ log ไว้
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to create user reservation",
 			"msg":   err.Error(),
 		})
 	}
