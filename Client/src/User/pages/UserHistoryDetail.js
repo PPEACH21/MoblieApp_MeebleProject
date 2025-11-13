@@ -17,6 +17,7 @@ import { useSelector } from "react-redux";
 import { api } from "../../api/axios";
 import { BaseColor as c } from "../../components/Color";
 import { Ionicons } from "@expo/vector-icons";
+import { m } from "../../paraglide/messages";
 
 /* ---------- helpers ---------- */
 const fmtTHB = (n) =>
@@ -226,10 +227,7 @@ export default function UserHistoryDetail() {
     <View style={styles.headerWrap}>
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>ประวัติคำสั่งซื้อ</Text>
-        <Text style={styles.subTitle}>เลขที่: {doc.historyId}</Text>
-        <Text style={styles.subHint}>
-          ย้ายเข้าประวัติ: {fmtDate(doc.movedToHistoryAt)}
-        </Text>
+        <Text style={styles.subTitle}>{m.No()}: {doc.historyId}</Text>
       </View>
       <StatusPill status={doc.status} />
     </View>
@@ -241,11 +239,11 @@ export default function UserHistoryDetail() {
         ร้าน: <Text style={styles.infoBold}>{doc.shop_name || "-"}</Text>
       </Text>
       <Text style={styles.infoRow}>
-        สร้างเมื่อ:{" "}
+        {m.createdAt()}:{" "}
         <Text style={styles.infoBold}>{fmtDate(doc.createdAt)}</Text>
       </Text>
       <Text style={styles.infoRow}>
-        อัปเดตล่าสุด:{" "}
+        {m.Latestupdate()}:{" "}
         <Text style={styles.infoBold}>{fmtDate(doc.updatedAt)}</Text>
       </Text>
     </View>
@@ -254,7 +252,7 @@ export default function UserHistoryDetail() {
   const Footer = () => (
     <View style={styles.footer}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.totalLabel}>ยอดรวม</Text>
+        <Text style={styles.totalLabel}>{m.total_all()}</Text>
         <Text style={styles.totalPrice}>{fmtTHB(computedTotal)}</Text>
       </View>
 
