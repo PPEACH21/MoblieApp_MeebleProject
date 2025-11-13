@@ -14,6 +14,7 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { api } from "../../api/axios";
+import { m } from "../../paraglide/messages";
 
 const fmtTHB = (n) =>
   (Number(n) || 0).toLocaleString("th-TH", {
@@ -82,7 +83,7 @@ export default function UserOrderDetail() {
     setErr(null);
     setLoading(true);
     try {
-      if (!orderId) throw new Error("ไม่พบรหัสคำสั่งซื้อ");
+      if (!orderId) throw new Error(m.no_order_found());
       let res = await api.get(`/orders/${orderId}`);
       if (!res?.data || res?.status === 404) {
         res = await api.get(`/order/${orderId}`);
@@ -109,7 +110,7 @@ export default function UserOrderDetail() {
         })),
       });
     } catch (e) {
-      setErr(e?.response?.data?.error || e?.message || "โหลดคำสั่งซื้อไม่สำเร็จ");
+      setErr(e?.response?.data?.error || e?.message || m.Failedorders());
     } finally {
       setLoading(false);
     }
@@ -130,7 +131,7 @@ export default function UserOrderDetail() {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 8, color: "#64748b" }}>กำลังโหลดคำสั่งซื้อ...</Text>
+        <Text style={{ marginTop: 8, color: "#64748b" }}>{m.loading()}...</Text>
       </View>
     );
   }
@@ -139,13 +140,13 @@ export default function UserOrderDetail() {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
         <Text style={{ color: "#b91c1c", textAlign: "center", marginBottom: 12 }}>
-          เกิดข้อผิดพลาด: {String(err)}
+          {m.error_occurred()}: {String(err)}
         </Text>
         <Pressable
           onPress={fetchOrder}
           style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: "#2563eb" }}
         >
-          <Text style={{ color: "white", fontWeight: "800" }}>ลองใหม่</Text>
+          <Text style={{ color: "white", fontWeight: "800" }}>{m.tryagain()}</Text>
         </Pressable>
       </View>
     );
@@ -154,7 +155,7 @@ export default function UserOrderDetail() {
   if (!order) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: "#64748b" }}>ไม่พบบันทึกคำสั่งซื้อ</Text>
+        <Text style={{ color: "#64748b" }}>{m.no_order_found()}</Text>
       </View>
     );
   }
@@ -207,10 +208,10 @@ export default function UserOrderDetail() {
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={{ fontSize: 18, fontWeight: "800", color: "#0f172a" }} numberOfLines={1}>
-              {order.shop_name || "คำสั่งซื้อ"}
+              {order.shop_name || m.Orders}
             </Text>
-            <Text style={{ color: "#64748b", marginTop: 2 }}>เลขที่: {order.id}</Text>
-            <Text style={{ color: "#64748b", marginTop: 2 }}>สร้างเมื่อ: {fmtDate(order.createdAt)}</Text>
+            <Text style={{ color: "#64748b", marginTop: 2 }}>{m.No()} : {order.id}</Text>
+            <Text style={{ color: "#64748b", marginTop: 2 }}>{m.createdAt()} : {fmtDate(order.createdAt)}</Text>
           </View>
           <StatusPill status={order.status} />
         </View>
@@ -226,7 +227,7 @@ export default function UserOrderDetail() {
               borderRadius: 12,
             }}
           >
-            <Text style={{ color: "#92400e", fontWeight: "800", marginBottom: 4 }}>หมายเหตุ</Text>
+            <Text style={{ color: "#92400e", fontWeight: "800", marginBottom: 4 }}>{m.Note()}</Text>
             <Text style={{ color: "#92400e" }}>{order.note}</Text>
           </View>
         )}
@@ -240,7 +241,7 @@ export default function UserOrderDetail() {
             ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
             ListEmptyComponent={
               <View style={{ padding: 16, alignItems: "center" }}>
-                <Text style={{ color: "#64748b" }}>ไม่มีสินค้าในคำสั่งซื้อนี้</Text>
+                <Text style={{ color: "#64748b" }}>{m.noitemorders()}</Text>
               </View>
             }
           />
@@ -257,7 +258,7 @@ export default function UserOrderDetail() {
             alignItems: "center",
           }}
         >
-          <Text style={{ color: "#334155" }}>ยอดรวม</Text>
+          <Text style={{ color: "#334155" }}>{m.total_all()}</Text>
           <Text style={{ fontSize: 18, fontWeight: "900", color: "#0f172a" }}>
             {fmtTHB(order.total)}
           </Text>
@@ -277,7 +278,7 @@ export default function UserOrderDetail() {
               backgroundColor: "#ffffff",
             }}
           >
-            <Text style={{ fontWeight: "800", color: "#0f172a" }}>กลับ</Text>
+            <Text style={{ fontWeight: "800", color: "#0f172a" }}>{m.back()}</Text>
           </Pressable>
         </View>
       </ScrollView>

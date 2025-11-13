@@ -241,5 +241,16 @@
   "resendOTP": "Resend OTP",
   "second": "s",
   "confirm": "Confirm",
-  "changePassword": "Change Password"
+  "changePassword": "Change Password",
+  "Home": "Home",
+  "Orders": "Orders",
+  "Reservations": "Reserve",
+  "Settings": "Settings",
+  "selectedrestarant": "Select Restarant Type",
+  "RemovefromCart": "from Cart?",
+  "createdAt": "Created At",
+  "No": "No.",
+  "Failedorders": "Failed to load orders",
+  "noitemorders": "No items in this order",
+  "back": "Back"
 }
