@@ -10,6 +10,7 @@ import U_Home from "./pages/U_Home";
 import UserOrderScreen from "./pages/UserOrder";
 import UserReserveScreen from "./pages/UserReservation";
 import UserSettingScreen from "./pages/UserSetting";
+import { m } from "../paraglide/messages";
 
 import Animated, { useSharedValue, withTiming, useAnimatedStyle, Easing ,withSequence, useDerivedValue,} from 'react-native-reanimated';
 const Tab = createBottomTabNavigator();
@@ -126,7 +127,7 @@ const TabStyle =({ state, descriptors, navigation }) => {
             <Animated.View style={[animatedIconStyle,{alignItems:'center', width:55}]}>
               <Ionicons name={iconName} size={24} color={isFocused ? c.white : c.black} />
               <Text style={{ color: isFocused ? c.white : c.black , fontWeight: "700", fontSize: 10 }}>
-                {label}
+                {m[label]()}
               </Text>
             </Animated.View>
           </TouchableOpacity>
@@ -149,13 +150,13 @@ export default function U_ButtonNav({ initialRouteName = "Home" }) {
       <Tab.Screen
         name="Home"
         component={U_Home}
-        options={{ title: "หน้าแรก" }}
+        options={{ title: "Home" }}
       />
 
       <Tab.Screen
         name="Orders"
         component={UserOrderScreen}
-        options={{ title: "คำสั่งซื้อ" }}
+        options={{ title: "Orders" }}
       />
 
       {/* <Tab.Screen
@@ -167,7 +168,7 @@ export default function U_ButtonNav({ initialRouteName = "Home" }) {
       <Tab.Screen
         name="Settings"
         component={UserSettingScreen}
-        options={{ title: "ตั้งค่า" }}
+        options={{ title: "Settings" }}
       />
     </Tab.Navigator>
   );

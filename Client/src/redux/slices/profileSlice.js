@@ -6,6 +6,7 @@ const initialState = {
   lastname:"",
   username:"" ,
   email:"",
+  coin:0,
   avatar:"",
   loading:false,
 };
@@ -29,6 +30,7 @@ const profileSlice = createSlice({
         state.firstname=action.payload.firstname;
         state.lastname=action.payload.lastname;
         state.username=action.payload.username;
+        state.coin=action.payload.coin;
         state.email=action.payload.email;
         state.avatar=action.payload.avatar;
     },
