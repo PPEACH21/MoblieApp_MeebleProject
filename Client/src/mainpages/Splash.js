@@ -2,7 +2,7 @@ import { Text, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback  } fro
 import { useEffect, useState } from "react";
 import { TextInputSplash } from "../components/TextInput";
 import Loading from "./Loading";
-
+import CountryFlag from "react-native-country-flag";
 import Animated, {useSharedValue,useAnimatedStyle,withDelay,withSequence,withTiming,Easing,cubicBezier,FadeIn,FadeOut} from "react-native-reanimated";
 import { Layout } from "../components/Layout";
 import { BaseColor as c } from "../components/Color";
@@ -389,8 +389,9 @@ const Splash = ({ navigation }) => {
                         },
                     ]}
                 />
-                <TouchableOpacity onPress={toggleLanguage} style={[Btn.Btn2,{alignSelf:'flex-end',marginTop:20}]}>
-                    <Text style={{fontSize:10}}>{m.Language()}</Text>
+                <TouchableOpacity onPress={toggleLanguage} style={[Btn.Btn2,{flexDirection:'row', gap:3,alignSelf:'flex-end',marginTop:20}]}>
+                    <Text style={{fontSize:10, fontWeight:'bold'}}>{m.Language()}</Text>
+                    <CountryFlag style={{borderRadius:3}} isoCode={language.toUpperCase()==="EN"?"US":language.toUpperCase()} size={16} />
                 </TouchableOpacity>
                 <View style={[{ flex: 1, justifyContent: "center" ,marginTop:-50}]}>
                     <Text
