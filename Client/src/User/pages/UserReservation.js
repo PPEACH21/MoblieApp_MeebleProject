@@ -10,7 +10,7 @@ import {
 import { useSelector } from "react-redux";
 import { api } from "../../api/axios";
 import { BaseColor as c } from "../../components/Color";
-
+import { m } from "../../paraglide/messages";
 /* ---------- format date ---------- */
 const fmtDateOnly = (v) => {
   try {
@@ -301,7 +301,13 @@ export default function UserReserveScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f3f4f6" }}>
+    <View style={{ flex: 1, backgroundColor: c.fullwhite }}>
+      <Text
+        style={{ fontSize: 23, fontWeight: "bold",marginLeft:10, padding: 10,marginTop:20, }}
+        allowFontScaling={false}
+      >
+        {m.Reservations()}
+      </Text>
       <FlatList
         contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
         data={reserves}

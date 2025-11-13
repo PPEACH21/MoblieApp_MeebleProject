@@ -228,7 +228,7 @@ const U_Home = () => {
 
   return (
     <View style={styles.container}>
-      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center' ,fontWeight: "bold", marginVertical:20, }}>
         <Text style={styles.header} allowFontScaling={false}>
           {m.Restarant()}
         </Text>
