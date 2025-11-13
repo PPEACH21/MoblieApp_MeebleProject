@@ -534,11 +534,9 @@ func ListReservationsByShop(c *fiber.Ctx) error {
 	ctx := config.Ctx
 	client := config.Client
 
-	q := client.
-		Collection("shops").
-		Doc(shopId).
-		Collection("reservations").
-		OrderBy("createdAt", firestore.Desc) // หรือ "startAt" ถ้า field คุณใช้ชื่อนั้น
+	// 👇 เปลี่ยนมาอ่านจาก collection "reservations"
+	q := client.Collection("reservations").
+		Where("shop_id", "==", shopId)
 
 	docs, err := q.Documents(ctx).GetAll()
 	if err != nil {
@@ -547,24 +545,22 @@ func ListReservationsByShop(c *fiber.Ctx) error {
 			"msg":   err.Error(),
 		})
 	}
-	if len(docs) == 0 {
-		return c.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "no reservations",
-		})
-	}
 
+	// ไม่มีข้อมูล —> ไม่ error แต่ส่งเป็น array ว่าง
 	items := make([]models.Reservation, 0, len(docs))
+
 	for _, d := range docs {
 		var r models.Reservation
 		if err := d.DataTo(&r); err != nil {
-			// map ไม่ได้ก็ข้าม
 			continue
 		}
 
-		// เผื่อ struct ไม่ได้เก็บ ID / ShopID
+		// เผื่อ struct ไม่ได้เก็บ ID
 		if r.ID == "" {
 			r.ID = d.Ref.ID
 		}
+
+		// เผื่อ struct ไม่ได้ map shop_id กลับ
 		if r.ShopID == "" {
 			r.ShopID = shopId
 		}
@@ -572,8 +568,8 @@ func ListReservationsByShop(c *fiber.Ctx) error {
 		items = append(items, r)
 	}
 
-	// 🔁 รูปแบบ response ยังเหมือนเดิม
 	return c.JSON(fiber.Map{
 		"reservations": items,
+		"count":        len(items),
 	})
 }
