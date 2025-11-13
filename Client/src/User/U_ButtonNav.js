@@ -159,11 +159,11 @@ export default function U_ButtonNav({ initialRouteName = "Home" }) {
         options={{ title: "Orders" }}
       />
 
-      {/* <Tab.Screen
+      <Tab.Screen
         name="Reservations"
         component={UserReserveScreen}
-        options={{ title: "การจอง" }}
-      /> */}
+        options={{ title: "Reservations" }}
+      />
 
       <Tab.Screen
         name="Settings"
