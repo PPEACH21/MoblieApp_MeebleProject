@@ -140,9 +140,10 @@ export default function ReserveShop() {
       let res;
       try {
         // ตาม route ที่มี: /shops/:id/reservations
-        res = await api.get(`/shops/${shopId}/reservations`, {
+        res = await api.get(`/shop/${shopId}/reservations`, {
           headers: { "Cache-Control": "no-cache", ...headers },
         });
+        console.log(res.data)
       } catch (e1) {
         if (e1?.response?.status === 404) {
           setResv([]);
