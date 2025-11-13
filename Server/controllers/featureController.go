@@ -485,6 +485,7 @@ func CreateReservation(c *fiber.Ctx) error {
 	resv := models.Reservation{
 		ID:        doc.ID,
 		ShopID:    shopId,
+		Phone:     body.Phone,
 		UserID:    body.UserID,
 		People:    body.People,
 		Note:      body.Note,

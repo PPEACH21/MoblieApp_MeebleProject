@@ -63,6 +63,7 @@ type Reservation struct {
 	ID        string    `json:"id,omitempty" firestore:"-"`
 	ShopID    string    `json:"shop_id" firestore:"shop_id"`
 	UserID    string    `json:"user_id" firestore:"user_id"`
+	Phone     string    `json:"phone" firestore:"phone"`
 	People    int       `json:"people" firestore:"people"`
 	Note      string    `json:"note,omitempty" firestore:"note,omitempty"`
 	DayKey    string    `json:"dayKey" firestore:"dayKey"`

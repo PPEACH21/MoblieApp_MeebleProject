@@ -43,12 +43,11 @@ const StatusPill = ({ status }) => {
   };
 
   const key = String(status || "").toLowerCase();
-  const sty =
-    map[key] || {
-      bg: "#e5e7eb",
-      fg: "#374151",
-      label: status || "ไม่ระบุ",
-    };
+  const sty = map[key] || {
+    bg: "#e5e7eb",
+    fg: "#374151",
+    label: status || "ไม่ระบุ",
+  };
 
   return (
     <View
@@ -124,9 +123,7 @@ export default function UserReserveScreen() {
         : [];
 
       // แปลง field ให้เป็นรูปเดียวกันก่อน
-      const base = list
-        .map(normalizeReservation)
-        .filter((x) => x.id);
+      const base = list.map(normalizeReservation).filter((x) => x.id);
 
       // ---------- ดึงชื่อร้านจาก shop_id ทั้งหมด ----------
       const shopIds = Array.from(
@@ -175,9 +172,7 @@ export default function UserReserveScreen() {
     } catch (e) {
       console.log("โหลดข้อมูลการจองไม่สำเร็จ", e?.message || e);
       setErr(
-        e?.response?.data?.error ||
-          e?.message ||
-          "โหลดข้อมูลการจองไม่สำเร็จ"
+        e?.response?.data?.error || e?.message || "โหลดข้อมูลการจองไม่สำเร็จ"
       );
       setReserves([]);
     } finally {
@@ -228,6 +223,11 @@ export default function UserReserveScreen() {
           <Text style={{ color: "#6b7280", marginTop: 2 }}>
             วันที่จอง: {item.date ? fmtDateOnly(item.date) : "-"}
           </Text>
+
+          <Text style={{ color: "#6b7280", marginTop: 8, fontWeight: "600" }}>
+            เบอร์โทร: {item.phone}
+          </Text>
+
           <Text style={{ color: "#6b7280", marginTop: 2 }}>
             จำนวนคน: {item.people}
           </Text>
@@ -303,7 +303,13 @@ export default function UserReserveScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.fullwhite }}>
       <Text
-        style={{ fontSize: 23, fontWeight: "bold",marginLeft:10, padding: 10,marginTop:20, }}
+        style={{
+          fontSize: 23,
+          fontWeight: "bold",
+          marginLeft: 10,
+          padding: 10,
+          marginTop: 20,
+        }}
         allowFontScaling={false}
       >
         {m.Reservations()}
@@ -318,9 +324,7 @@ export default function UserReserveScreen() {
         }
         ListEmptyComponent={
           <View style={{ paddingTop: 40, alignItems: "center" }}>
-            <Text style={{ color: "#6b7280" }}>
-              ยังไม่มีประวัติการจองร้าน
-            </Text>
+            <Text style={{ color: "#6b7280" }}>ยังไม่มีประวัติการจองร้าน</Text>
           </View>
         }
       />

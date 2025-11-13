@@ -69,13 +69,7 @@ const normalizeReservations = (data) => {
       startAt: start,
       people:
         Number(
-          r.people ??
-            r.party_size ??
-            r.guests ??
-            r.qty ??
-            r.count ??
-            r.pax ??
-            1
+          r.people ?? r.party_size ?? r.guests ?? r.qty ?? r.count ?? r.pax ?? 1
         ) || 1,
       user_id: r.user_id || r.userId || r.customer_id || "-",
       phone: r.phone || r.customerPhone || r.customer_phone || "",
@@ -91,16 +85,13 @@ export default function ReserveShop() {
 
   const [shopId, setShopId] = useState(null);
   const [resv, setResv] = useState([]);
-  const [loading, setLoading] = useState(true);      // โหลดครั้งแรก
+  const [loading, setLoading] = useState(true); // โหลดครั้งแรก
   const [refreshing, setRefreshing] = useState(false); // pull-to-refresh
   const [err, setErr] = useState(null);
 
   // memo header กัน object ใหม่ทุก render (กัน useEffect ลูป)
   const headers = useMemo(
-    () =>
-      Auth?.token
-        ? { Authorization: `Bearer ${Auth.token}` }
-        : undefined,
+    () => (Auth?.token ? { Authorization: `Bearer ${Auth.token}` } : undefined),
     [Auth?.token]
   );
 
@@ -143,7 +134,7 @@ export default function ReserveShop() {
         res = await api.get(`/shop/${shopId}/reservations`, {
           headers: { "Cache-Control": "no-cache", ...headers },
         });
-        console.log(res.data)
+        console.log(res.data);
       } catch (e1) {
         if (e1?.response?.status === 404) {
           setResv([]);
@@ -191,9 +182,9 @@ export default function ReserveShop() {
   }, [shopId, fetchReservations]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);          // spinner ด้านบนเริ่มหมุน
-    await fetchReservations();    // ใช้ฟังก์ชันเดียวกัน
-    setRefreshing(false);         // ดับ spinner
+    setRefreshing(true); // spinner ด้านบนเริ่มหมุน
+    await fetchReservations(); // ใช้ฟังก์ชันเดียวกัน
+    setRefreshing(false); // ดับ spinner
   }, [fetchReservations]);
 
   const renderItem = ({ item: r }) => (
@@ -225,6 +216,9 @@ export default function ReserveShop() {
         <Text style={{ color: c.black, fontWeight: "700" }}>
           {fmtDateTime(r.startAt || r.createdAt)}
         </Text>
+        <Text style={{ color: "#6b7280", marginTop: 2 }}>
+          เบอร์โทร: {r.phone}
+        </Text>
       </Text>
 
       <Text style={{ marginTop: 2, color: c.black, opacity: 0.7 }}>
@@ -238,19 +232,14 @@ export default function ReserveShop() {
         </Text>
       )}
       {!!r.note && (
-        <Text style={{ marginTop: 6, color: c.black }}>
-          หมายเหตุ: {r.note}
-        </Text>
+        <Text style={{ marginTop: 6, color: c.black }}>หมายเหตุ: {r.note}</Text>
       )}
     </View>
   );
 
   const totals = useMemo(() => {
     const count = resv.length;
-    const people = resv.reduce(
-      (acc, r) => acc + (Number(r.people) || 0),
-      0
-    );
+    const people = resv.reduce((acc, r) => acc + (Number(r.people) || 0), 0);
     return { count, people };
   }, [resv]);
 
