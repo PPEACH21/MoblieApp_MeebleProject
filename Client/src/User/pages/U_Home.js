@@ -18,14 +18,17 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseColor as c } from "../../components/Color";
 import { api } from "../../api/axios";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { m } from "../../paraglide/messages";
+import { getProfile } from "../../redux/actions/profileAction";
 
 const CHIP_H = 34;
 
 const U_Home = () => {
   const navigation = useNavigation();
   const Auth = useSelector((s) => s.auth);
-
+  const Profile = useSelector((s) => s.profile);
+  const Dispatch =useDispatch()
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,6 +100,7 @@ const U_Home = () => {
     setRefreshing(true);
     await fetchShops();
     await fetchCartSummary();
+    Dispatch(getProfile())
     setRefreshing(false);
   };
 
@@ -171,7 +175,7 @@ const U_Home = () => {
                 ]}
                 allowFontScaling={false}
               >
-                {isOpen ? "เปิดอยู่" : "ปิดอยู่"}
+                {isOpen ? m.open(): m.close()}
               </Text>
             </View>
             {item.reserve_active && (
@@ -180,7 +184,7 @@ const U_Home = () => {
                   style={[styles.badgeTxt, { color: c.fullwhite }]}
                   allowFontScaling={false}
                 >
-                  จองร้าน
+                  {m.reserveOpen()}
                 </Text>
               </View>
             )}
@@ -216,7 +220,7 @@ const U_Home = () => {
       <View style={styles.center}>
         <ActivityIndicator size="large" color={c.S2} />
         <Text style={{ color: c.S5, marginTop: 8 }} allowFontScaling={false}>
-          กำลังโหลดร้านค้า...
+          {m.loading()}...
         </Text>
       </View>
     );
@@ -224,9 +228,15 @@ const U_Home = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header} allowFontScaling={false}>
-        ร้านทั้งหมด
-      </Text>
+      <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+        <Text style={styles.header} allowFontScaling={false}>
+          {m.Restarant()}
+        </Text>
+        <Text style={[styles.header , {marginRight:30 ,fontSize:16}]} allowFontScaling={false}>
+          {m.Coin()} {Profile.coin}.-
+        </Text>
+      </View>
+
 
       {/* 🔎 Search */}
       <View style={styles.searchRow}>
@@ -234,7 +244,7 @@ const U_Home = () => {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="ค้นหาร้าน / คำอธิบาย / ประเภท"
+          placeholder={m.Search()}
           placeholderTextColor="#9aa2a9"
           style={styles.searchInput}
           returnKeyType="search"
@@ -254,9 +264,8 @@ const U_Home = () => {
           onPress={() => setOnlyOpen((v) => !v)}
           style={[
             styles.togglePill,
-            onlyOpen && { backgroundColor: c.green, borderColor: c.green },
+            onlyOpen ?{backgroundColor: c.green, borderColor: c.green }:{backgroundColor: c.fullwhite, borderColor: c.S3 },
           ]}
-          android_ripple={{ color: "#00000011" }}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <Ionicons
@@ -266,10 +275,10 @@ const U_Home = () => {
             style={{ marginRight: 6 }}
           />
           <Text
-            style={[styles.toggleTxt, onlyOpen && { color: c.fullwhite }]}
+            style={[styles.toggleTxt, onlyOpen ?{color:c.fullwhite} : {color:c.black}]}
             allowFontScaling={false}
           >
-            เปิดอยู่
+            {m.open()}
           </Text>
         </Pressable>
 
@@ -278,12 +287,8 @@ const U_Home = () => {
           onPress={() => setOnlyReservable((v) => !v)}
           style={[
             styles.togglePill,
-            onlyReservable && {
-              backgroundColor: c.green,
-              borderColor: c.green,
-            },
+            onlyReservable  ?{backgroundColor: c.green, borderColor: c.green }:{backgroundColor: c.fullwhite, borderColor: c.S3 },
           ]}
-          android_ripple={{ color: "#00000011" }}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <Ionicons
@@ -296,7 +301,7 @@ const U_Home = () => {
             style={[styles.toggleTxt, onlyReservable && { color: c.fullwhite }]}
             allowFontScaling={false}
           >
-            จองได้
+            {m.reserveOpen()}
           </Text>
         </Pressable>
 
@@ -317,7 +322,7 @@ const U_Home = () => {
             numberOfLines={1}
             allowFontScaling={false}
           >
-            {type === "all" ? "ทุกประเภท" : type}
+            {type === "all" ? m.type() : type}
           </Text>
           <Ionicons name="chevron-down" size={16} color={c.S5} />
         </Pressable>
@@ -341,7 +346,7 @@ const U_Home = () => {
         }
         ListEmptyComponent={
           <Text style={styles.emptyText} allowFontScaling={false}>
-            ไม่พบร้านตามเงื่อนไข
+            {m.shop_not_found()}
           </Text>
         }
         keyboardShouldPersistTaps="handled"
@@ -364,7 +369,7 @@ const U_Home = () => {
           />
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle} allowFontScaling={false}>
-              เลือกประเภทอาหาร
+              {m.selectedrestarant()}
             </Text>
 
             <FlatList
@@ -372,7 +377,7 @@ const U_Home = () => {
               keyExtractor={(it, i) => String(`${it}-${i}`)}
               renderItem={({ item }) => {
                 const selected = type === item;
-                const label = item === "all" ? "ทุกประเภท" : String(item || "");
+                const label = item === "all" ? m.type() : String(item || "");
                 return (
                   <Pressable
                     onPress={() => {
@@ -408,7 +413,7 @@ const U_Home = () => {
               onPress={() => setTypePickerVisible(false)}
             >
               <Text style={styles.modalCloseTxt} allowFontScaling={false}>
-                ปิด
+                {m.close()}
               </Text>
             </Pressable>
           </View>
@@ -478,8 +483,6 @@ const styles = StyleSheet.create({
     minHeight: CHIP_H,
     borderRadius: CHIP_H / 2,
     borderWidth: 1,
-    borderColor: c.S4,
-    backgroundColor: c.fullwhite,
     marginRight: 8,
   },
   toggleTxt: {

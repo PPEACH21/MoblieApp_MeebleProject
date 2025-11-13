@@ -17,6 +17,7 @@ import { useSelector } from "react-redux";
 import { api } from "../../api/axios";
 import { BaseColor as c } from "../../components/Color";
 import { Ionicons } from "@expo/vector-icons";
+import { m } from "../../paraglide/messages";
 
 /* ---------- helpers ---------- */
 const fmtTHB = (n) =>
@@ -79,7 +80,7 @@ export default function Cart() {
       setErr(null);
       if (!refreshing) setLoading(true);
       const customerId = Auth.user;
-      if (!customerId) throw new Error("ยังไม่ได้เข้าสู่ระบบ");
+      if (!customerId) throw new Error(m.unauthorized());
 
       const res = await api.get("/cart", { params: { customerId } });
       const data = res?.data || {};
@@ -101,7 +102,7 @@ export default function Cart() {
       setShopId(data.shopId || "");
       setUpdatedAt(data.updatedAt || null);
     } catch (e) {
-      setErr(e?.response?.data?.error || e?.message || "โหลดตะกร้าไม่สำเร็จ");
+      setErr(e?.response?.data?.error || e?.message || m.shop_not_found());
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -141,17 +142,17 @@ export default function Cart() {
     } catch (e) {
       await fetchCart(); // rollback by reload
       const msg =
-        e?.response?.data?.error || e?.message || "ปรับจำนวนไม่สำเร็จ";
-      Alert.alert("ผิดพลาด", msg);
+        e?.response?.data?.error || e?.message || m.add_to_cart_invalid_qty();
+      Alert.alert(m.error_occurred(), msg);
     }
   };
 
   const increase = (it) => updateQty(it.id, (Number(it.qty) || 0) + 1);
   const decrease = (it) => updateQty(it.id, (Number(it.qty) || 0) - 1);
   const removeItem = (it) =>
-    Alert.alert("ลบรายการ", `ลบ "${it.name}" ออกจากตะกร้า?`, [
-      { text: "ยกเลิก" },
-      { text: "ลบ", style: "destructive", onPress: () => updateQty(it.id, 0) },
+    Alert.alert(m.delete(), `${m.delete()} "${it.name}" ${m.RemovefromCart()}?`, [
+      { text: m.cancel() },
+      { text: m.delete(), style: "destructive", onPress: () => updateQty(it.id, 0) },
     ]);
 
   const gotoShop = () => {
@@ -163,7 +164,7 @@ export default function Cart() {
     const userId = Auth.user;
     const customerId = Auth.user;
     if (!userId || !customerId) {
-      Alert.alert("ยังไม่ได้เข้าสู่ระบบ", "กรุณาเข้าสู่ระบบก่อนชำระเงิน");
+      Alert.alert(m.unauthorized(), m.MustLogin());
       return;
     }
     if (items.length === 0) {

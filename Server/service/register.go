@@ -72,7 +72,7 @@ func CreateUser(c *fiber.Ctx) error {
 			"username": 	user.Username,
 			"password":   user.Password,
 			"verified": false,
-			"Cost": 0,
+			"Cost": 10000,
 			"createdat": firestore.ServerTimestamp,
 		})
 		if err != nil {
