@@ -6,12 +6,31 @@ import UserShopDetail from "./pages/UserShopDetail";
 import Cart from "./pages/UserCart";
 import UserOrderDetail from "./pages/UserOrderDetail";
 import UserHistoryDetail from "./pages/UserHistoryDetail";
-
+import { m } from "../paraglide/messages";
 const Stack = createNativeStackNavigator();
 
 export default function UserStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+     headerStyle: {                    // ลดความสูง
+      backgroundColor: 'transparent',   // ทำให้โปร่งใส
+      elevation: 0,                     // ตัด shadow Android
+      shadowOpacity: 0,   
+      height: 50,               // ควบคุมเอง
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      backgroundColor: '#fff',
+      shadowColor: '#000',            // ตัด shadow iOS
+    },
+    headerTitleStyle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    headerTitleAlign: 'center',
+  }}
+    >
       <Stack.Screen
         name="UserTabs"
         component={U_ButtonNav}
@@ -20,22 +39,23 @@ export default function UserStack() {
       <Stack.Screen
         name="UserShopDetail"
         component={UserShopDetail}
-        options={{ headerShown: true, title: "รายละเอียดร้าน" }}
+        options={{ headerShown: true, title: m.shopdetail() }}
       />
       <Stack.Screen
         name="Cart"
         component={Cart}
-        options={{ headerShown: true, title: "ตะกร้าสินค้า" }}
+        options={{ headerShown: true, title: m.cart() }}
       />
       <Stack.Screen
         name="UserOrderDetail"
         component={UserOrderDetail}
-        options={{ headerShown: true, title: "รายละเอียดออเดอร์" }}
-      />
+        options={{ headerShown: true, title: m.order_detail() }}
+/>
+
       <Stack.Screen
         name="UserHistoryDetail"
         component={UserHistoryDetail}
-        options={{ headerShown: true, title: "รายละเอียดประวัติออเดอร์" }}
+        options={{ headerShown: true, title: m.order_detail()}}
       />
 
     </Stack.Navigator>
