@@ -17,10 +17,11 @@ import {
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { api } from "../../api/axios";
+import { m } from "../../paraglide/messages";
 
 const TABS = [
-  { key: "active", label: "กำลังดำเนินการ" },
-  { key: "history", label: "ประวัติ" },
+  { key: "active", label: m.processing() },
+  { key: "history", label: m.history()},
 ];
 
 const ACTIVE_STATUSES = new Set(["prepare", "ready", "unknown", "pending"]);
@@ -237,13 +238,13 @@ export default function UserOrderScreen() {
   }, [highlightId, data]);
 
   const StatusPill = ({ status }) => {
-    const map = {
-      prepare: { bg: "#fff7ed", fg: "#9a3412", label: "กำลังเตรียม" },
-      ready: { bg: "#ecfeff", fg: "#155e75", label: "พร้อมรับ/ส่ง" },
-      completed: { bg: "#ecfdf5", fg: "#065f46", label: "เสร็จสิ้น" },
-      canceled: { bg: "#fee2e2", fg: "#991b1b", label: "ยกเลิก" },
-      unknown: { bg: "#eef2ff", fg: "#3730a3", label: "กำลังดำเนินการ" },
-    };
+      const map = {
+        prepare: { bg: "#fff7ed", fg: "#9a3412", label:m.processing() },
+        ready: { bg: "#ecfeff", fg: "#155e75", label: m.ongoing() },
+        completed: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
+        canceled: { bg: "#fee2e2", fg: "#991b1b", label: m.cancel() },
+        unknown: { bg: "#eef2ff", fg: "#3730a3", label:"unknown"},
+      };
     const sty = map[status] || map.unknown;
     return (
       <View
@@ -327,14 +328,14 @@ export default function UserOrderScreen() {
             justifyContent: "space-between",
           }}
         >
-          <Text style={{ color: "#334155" }}>ยอดรวม</Text>
+          <Text style={{ color: "#334155" }}>{m.total_all()}</Text>
           <Text style={{ fontWeight: "800", color: "#111827" }}>
             {fmtTHB(item.total)}
           </Text>
         </View>
 
         <Text style={{ marginTop: 4, color: "#64748b" }}>
-          {tab === "history" ? "เสร็จสิ้นเมื่อ" : "สร้างเมื่อ"}:{" "}
+          {tab === "history" ? m.SuccessAt() : m.createdAt()}:{" "}
           {fmtDate(item.createdAt)}
         </Text>
 
@@ -390,6 +391,7 @@ export default function UserOrderScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
+      <Text style={{fontSize:23,fontWeight:"bold", padding:15}} allowFontScaling={false}>{m.Orders()}</Text>
       <TabBar />
       <FlatList
         ref={listRef}

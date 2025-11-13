@@ -246,7 +246,7 @@ export default function Cart() {
   const Footer = () => (
     <View style={styles.footer}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.totalLabel}>ยอดรวม</Text>
+        <Text style={styles.totalLabel}>{m.total_all()}</Text>
         <Text style={styles.totalPrice}>{fmtTHB(total)}</Text>
       </View>
 

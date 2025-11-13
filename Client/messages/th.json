@@ -246,10 +246,13 @@
   "Reservations": "การจอง",
   "Settings": "ตั่งค่า",
   "selectedrestarant": "เลือกประเภทร้าน",
-  "RemovefromCart":"ออกจากตะกร้า",
-  "createdAt":"สร้างเมื่อ",
-  "No":"เลขที่",
-  "Failedorders":"โหลดคำสั่งซื้อไม่สำเร็จ",
-  "noitemorders":"ไม่มีสินค้าในคำสั่งซื้อนี้",
-  "back": "กลับ"
+  "RemovefromCart": "ออกจากตะกร้า",
+  "createdAt": "สร้างเมื่อ",
+  "No": "เลขที่",
+  "Failedorders": "โหลดคำสั่งซื้อไม่สำเร็จ",
+  "noitemorders": "ไม่มีสินค้าในคำสั่งซื้อนี้",
+  "back": "กลับ",
+  "Latestupdate": "อัพเดทล่าสุด",
+  "SucessAt": "เสร็จสิ้นเมื่อ",
+  "shopdetail": "รายละเอียดร้าน"
 }
