@@ -273,13 +273,13 @@ export default function UserOrderScreen() {
   }, [highlightId, data]);
 
   const StatusPill = ({ status }) => {
-    const map = {
-      prepare: { bg: "#fff7ed", fg: "#9a3412", label: m.processing() },
-      ready: { bg: "#ecfeff", fg: "#155e75", label: m.ongoing() },
-      completed: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
-      canceled: { bg: "#fee2e2", fg: "#991b1b", label: m.cancel() },
-      unknown: { bg: "#eef2ff", fg: "#3730a3", label: "unknown" },
-    };
+      const map = {
+        prepare: { bg: "#fff7ed", fg: "#9a3412", label:m.processing() },
+        ongoing: { bg: "#ecfeff", fg: "#155e75", label: m.ongoing() },
+        success: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
+        canceled: { bg: "#fee2e2", fg: "#991b1b", label: m.cancel() },
+        unknown: { bg: "#eef2ff", fg: "#3730a3", label:"unknown"},
+      };
     const sty = map[status] || map.unknown;
     return (
       <View
