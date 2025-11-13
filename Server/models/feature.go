@@ -70,11 +70,10 @@ type Reservation struct {
 }
 
 type CreateReservationReq struct {
-	UserID  string    `json:"user_id"`
-	People  int       `json:"people"`
-	Phone   string    `json:"phone,omitempty"`
-	Note    string    `json:"note,omitempty"`
-	StartAt time.Time `json:"startAt"`
+	UserID string `json:"user_id"`
+	People int    `json:"people"`
+	Phone  string `json:"phone,omitempty"`
+	Note   string `json:"note,omitempty"`
 }
 
 const ColReservations = "reservations"

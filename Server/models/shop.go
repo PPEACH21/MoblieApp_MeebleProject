@@ -46,15 +46,17 @@ type Shop struct {
 }
 
 type UpdateShopBody struct {
-	ShopName      *string   `json:"shop_name"`
-	Description   *string   `json:"description"`
-	Type          *string   `json:"type"`
-	Image         *string   `json:"image"`
-	Status        *string   `json:"status"` // "open" | "closed"
-	OrderActive   *bool     `json:"order_active"`
-	ReserveActive *bool     `json:"reserve_active"`
-	Address       *GeoPoint `json:"address"`
-	Location      any       `json:"location"` // legacy
+	ShopName    *string `json:"shop_name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Type        *string `json:"type,omitempty"`
+	Image       *string `json:"image,omitempty"`
+
+	Status        *bool `json:"status,omitempty"`
+	OrderActive   *bool `json:"order_active,omitempty"`
+	ReserveActive *bool `json:"reserve_active,omitempty"`
+
+	Address  *GeoPoint `json:"address,omitempty"`
+	Location any       `json:"location,omitempty"` // legacy
 }
 
 const (
