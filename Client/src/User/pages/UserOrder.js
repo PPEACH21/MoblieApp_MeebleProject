@@ -274,9 +274,9 @@ export default function UserOrderScreen() {
 
   const StatusPill = ({ status }) => {
       const map = {
-        prepare: { bg: "#fff7ed", fg: "#9a3412", label:m.processing() },
-        ongoing: { bg: "#ecfeff", fg: "#155e75", label: m.ongoing() },
-        success: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
+        prepare: { bg: "#fff7ed", fg: "#9a3412", label:m.status_preparing() },
+        ready: { bg: "#ecfeff", fg: "#155e75", label: m.status_shipping() },
+        completed: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
         canceled: { bg: "#fee2e2", fg: "#991b1b", label: m.cancel() },
         unknown: { bg: "#eef2ff", fg: "#3730a3", label:"unknown"},
       };
@@ -444,7 +444,7 @@ export default function UserOrderScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       <Text
-        style={{ fontSize: 23, fontWeight: "bold", padding: 15 }}
+        style={{ fontSize: 23, fontWeight: "bold",marginLeft:10, padding: 10,marginTop:20, }}
         allowFontScaling={false}
       >
         {m.Orders()}
