@@ -65,12 +65,12 @@ export default function AppTabs({ shopId, initialRouteName = "Home" }) {
         options={{ title: "เมนูในร้าน" }}
       />
 
-      {/* <Tab.Screen
+      <Tab.Screen
         name="Reserve"
         component={ReserveShopScreen}
         initialParams={{ shopId: String(shopId || "") }}
         options={{ title: "การจอง" }}
-      /> */}
+      />
 
       <Tab.Screen
         name="Settings"

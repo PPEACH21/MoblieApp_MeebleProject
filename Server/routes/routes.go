@@ -21,7 +21,7 @@ func Routes(app *fiber.App) {
 	app.Put("/shop/:id/update", controllers.UpdateShopBasic) // basic fields
 	app.Put("/shop/:id", controllers.UpdateShop)             // generic partial update
 	app.Delete("/shop/:id", controllers.DeleteShop)
-
+	app.Get("/shop/:shopId/name", controllers.GetShopNameById)
 	/* ---------- MENU ---------- */
 	app.Post("/shop/:id/menu", controllers.CreateMenuItem)
 	app.Get("/shop/:id/menu", controllers.ListMenuItems)
@@ -40,8 +40,8 @@ func Routes(app *fiber.App) {
 	app.Get("/:uid/history/:historyId", controllers.GetUserHistoryDetail)
 	/* ---------- RESERVATIONS ---------- */
 	app.Post("/shops/:id/reservations", controllers.CreateReservation)
-	app.Get("/shops/:id/reservations", controllers.ListReservationsByShop)
-	app.Get("/reservations/user", controllers.GetUserReservations)
+	app.Get("/shop/:id/reservations", controllers.ListReservationsByShop)
+	app.Get("/users/:userId/reservations", controllers.GetUserReservations)
 	/* ---------- CART ---------- */
 	app.Get("/cart", controllers.GetCart)
 	app.Post("/cart/add", controllers.AddToCart)

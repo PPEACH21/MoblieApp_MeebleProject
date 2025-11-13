@@ -21,11 +21,12 @@ import { m } from "../../paraglide/messages";
 
 const TABS = [
   { key: "active", label: m.processing() },
-  { key: "history", label: m.history()},
+  { key: "history", label: m.history() },
 ];
 
+// 👇 เพิ่ม success / done เผื่อ backend ใช้คำพวกนี้
 const ACTIVE_STATUSES = new Set(["prepare", "ready", "unknown", "pending"]);
-const HISTORY_STATUSES = new Set(["completed", "canceled"]);
+const HISTORY_STATUSES = new Set(["completed", "canceled", "success", "done"]);
 
 const fmtTHB = (n) =>
   (Number(n) || 0).toLocaleString("th-TH", {
@@ -76,7 +77,6 @@ export default function UserOrderScreen() {
   const listRef = useRef(null);
 
   const normalize = (o, isHistory = false) => {
-    // ตุน shopId และพยายามหา shop_name จากหลายฟิลด์
     const shopId =
       o.shopId || o.shop_id || o.shop?.id || o.shop?.shopId || "";
     let shopName =
@@ -106,7 +106,11 @@ export default function UserOrderScreen() {
 
     try {
       const r = await api.get(`/shop/${shopId}`);
-      const name = r?.data?.shop?.name || r?.data?.name || r?.data?.shop_name || "-";
+      const name =
+        r?.data?.shop?.name ||
+        r?.data?.name ||
+        r?.data?.shop_name ||
+        "-";
       shopNameCache.set(shopId, name || "-");
       return name || "-";
     } catch {
@@ -120,25 +124,24 @@ export default function UserOrderScreen() {
     async (list) => {
       if (!Array.isArray(list) || list.length === 0) return list;
 
-      // หา shopId ที่ยังไม่มีชื่อ
       const needIds = Array.from(
         new Set(
           list
-            .filter((x) => (x.shop_name == null || x.shop_name === "-") && x.shopId)
+            .filter(
+              (x) => (x.shop_name == null || x.shop_name === "-") && x.shopId
+            )
             .map((x) => x.shopId)
         )
       );
 
       if (needIds.length === 0) return list;
 
-      // ยิงขอชื่อทุกร้านที่ขาดแบบ parallel (แต่มี cache กันซ้ำอยู่แล้ว)
       const pairs = await Promise.all(
         needIds.map(async (sid) => [sid, await fetchShopName(sid)])
       );
 
-      const nameMap = new Map(pairs); // Map<shopId, shopName>
+      const nameMap = new Map(pairs);
 
-      // คืนลิสต์ที่ใส่ชื่อร้านแล้ว
       return list.map((x) => {
         if ((x.shop_name == null || x.shop_name === "-") && x.shopId) {
           const name = nameMap.get(x.shopId);
@@ -152,44 +155,76 @@ export default function UserOrderScreen() {
     [fetchShopName]
   );
 
-  const fetchActive = useCallback(async (uid) => {
-    const res = await api.get("/userOrders", { params: { userId: uid } });
-    const rows = Array.isArray(res?.data) ? res.data : res?.data?.orders || [];
-    const list = rows.map((o) => normalize(o, false));
-    const filtered = list.filter(
-      (x) => ACTIVE_STATUSES.has(x.status) || !HISTORY_STATUSES.has(x.status)
-    );
-    // เติมชื่อร้านถ้าขาด
-    return await fillMissingShopNames(filtered);
-  }, [fillMissingShopNames]);
+  const fetchActive = useCallback(
+    async (uid) => {
+      const res = await api.get("/userOrders", { params: { userId: uid } });
+      const rows = Array.isArray(res?.data)
+        ? res.data
+        : res?.data?.orders || [];
+      const list = rows.map((o) => normalize(o, false));
 
-  const fetchHistory = useCallback(async (uid) => {
-    // หลัก: /users/:uid/history
-    try {
-      const r = await api.get(`/users/${uid}/history`);
-      const rows = Array.isArray(r?.data)
-        ? r.data
-        : r?.data?.history || r?.data?.orders || [];
-      if (rows?.length) {
-        const list = rows.map((o) => normalize(o, true));
-        return await fillMissingShopNames(list);
+      // ✅ active = สถานะที่อยู่ใน ACTIVE_STATUSES เท่านั้น
+      const filtered = list.filter((x) => ACTIVE_STATUSES.has(x.status));
+
+      return await fillMissingShopNames(filtered);
+    },
+    [fillMissingShopNames]
+  );
+
+  const fetchHistory = useCallback(
+    async (uid) => {
+      let rows = [];
+
+      // 1) ลองแบบ /users/:uid/history (ถ้ามี)
+      try {
+        const r = await api.get(`/users/${uid}/history`);
+        rows = Array.isArray(r?.data)
+          ? r.data
+          : r?.data?.history || r?.data?.orders || [];
+      } catch (e1) {
+        // 2) ลองแบบ /:uid/history ตาม route Go ที่คุณเคยใช้
+        try {
+          const r2 = await api.get(`/${uid}/history`);
+          rows = Array.isArray(r2?.data)
+            ? r2.data
+            : r2?.data?.history || r2?.data?.orders || [];
+        } catch (e2) {
+          // 3) fallback: /userOrders?status=completed
+          try {
+            const r3 = await api.get("/userOrders", {
+              params: { userId: uid, status: "completed" },
+            });
+            rows = Array.isArray(r3?.data)
+              ? r3.data
+              : r3?.data?.orders || [];
+          } catch (e3) {
+            rows = [];
+          }
+        }
       }
-    } catch {}
 
-    // fallback: /userOrders?status=completed
-    try {
-      const r2 = await api.get("/userOrders", {
-        params: { userId: uid, status: "completed" },
-      });
-      const rows = Array.isArray(r2?.data) ? r2.data : r2?.data?.orders || [];
-      if (rows?.length) {
-        const list = rows.map((o) => normalize(o, true));
-        return await fillMissingShopNames(list);
-      }
-    } catch {}
+      if (!rows || !rows.length) return [];
 
-    return [];
-  }, [fillMissingShopNames]);
+      let list = rows.map((o) => normalize(o, true));
+      list = await fillMissingShopNames(list);
+
+      // ✅ history = เฉพาะสถานะใน HISTORY_STATUSES
+      list = list.filter((x) => HISTORY_STATUSES.has(x.status));
+
+      // ✅ sort ให้รายการล่าสุดอยู่บนสุด
+      const toTime = (x) => {
+        const d =
+          typeof x.createdAt === "object" && x.createdAt?.seconds
+            ? new Date(x.createdAt.seconds * 1000)
+            : new Date(x.createdAt || 0);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+      };
+      list.sort((a, b) => toTime(b) - toTime(a));
+
+      return list;
+    },
+    [fillMissingShopNames]
+  );
 
   const fetchAll = useCallback(async () => {
     try {
@@ -238,13 +273,13 @@ export default function UserOrderScreen() {
   }, [highlightId, data]);
 
   const StatusPill = ({ status }) => {
-      const map = {
-        prepare: { bg: "#fff7ed", fg: "#9a3412", label:m.processing() },
-        ready: { bg: "#ecfeff", fg: "#155e75", label: m.ongoing() },
-        completed: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
-        canceled: { bg: "#fee2e2", fg: "#991b1b", label: m.cancel() },
-        unknown: { bg: "#eef2ff", fg: "#3730a3", label:"unknown"},
-      };
+    const map = {
+      prepare: { bg: "#fff7ed", fg: "#9a3412", label: m.processing() },
+      ready: { bg: "#ecfeff", fg: "#155e75", label: m.ongoing() },
+      completed: { bg: "#ecfdf5", fg: "#065f46", label: m.success() },
+      canceled: { bg: "#fee2e2", fg: "#991b1b", label: m.cancel() },
+      unknown: { bg: "#eef2ff", fg: "#3730a3", label: "unknown" },
+    };
     const sty = map[status] || map.unknown;
     return (
       <View
@@ -314,7 +349,12 @@ export default function UserOrderScreen() {
           backgroundColor: isHL ? "#fffbeb" : "white",
         }}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+          }}
+        >
           <Text style={{ fontWeight: "800", color: "#0f172a" }}>
             ร้าน: {item.shop_name}
           </Text>
@@ -340,7 +380,13 @@ export default function UserOrderScreen() {
         </Text>
 
         {isHL && (
-          <Text style={{ marginTop: 6, color: "#a16207", fontWeight: "700" }}>
+          <Text
+            style={{
+              marginTop: 6,
+              color: "#a16207",
+              fontWeight: "700",
+            }}
+          >
             • รายการล่าสุดของคุณ
           </Text>
         )}
@@ -350,7 +396,9 @@ export default function UserOrderScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+      <View
+        style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+      >
         <ActivityIndicator size="large" />
         <Text style={{ marginTop: 8, color: "#64748b" }}>
           กำลังโหลดคำสั่งซื้อ...
@@ -370,7 +418,11 @@ export default function UserOrderScreen() {
         }}
       >
         <Text
-          style={{ color: "#b91c1c", textAlign: "center", marginBottom: 12 }}
+          style={{
+            color: "#b91c1c",
+            textAlign: "center",
+            marginBottom: 12,
+          }}
         >
           เกิดข้อผิดพลาด: {String(err)}
         </Text>
@@ -391,7 +443,12 @@ export default function UserOrderScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
-      <Text style={{fontSize:23,fontWeight:"bold", padding:15}} allowFontScaling={false}>{m.Orders()}</Text>
+      <Text
+        style={{ fontSize: 23, fontWeight: "bold", padding: 15 }}
+        allowFontScaling={false}
+      >
+        {m.Orders()}
+      </Text>
       <TabBar />
       <FlatList
         ref={listRef}

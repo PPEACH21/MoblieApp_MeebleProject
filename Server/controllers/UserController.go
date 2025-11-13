@@ -723,8 +723,7 @@ func UpdateProfile(c *fiber.Ctx) error {
 	})
 }
 func GetUserReservations(c *fiber.Ctx) error {
-	// 1) รับ userId จาก query (?userId=xxx)
-	userId := c.Query("userId")
+	userId := c.Params("userId")
 	if userId == "" {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "userId required",
@@ -734,13 +733,7 @@ func GetUserReservations(c *fiber.Ctx) error {
 	ctx := config.Ctx
 	client := config.Client
 
-	// 2) ดึงจาก collection "reservations" (ดูให้ตรงกับที่ตั้งชื่อไว้ใน models.ColReservations)
-	//    อย่าลืม field ใน Firestore ชื่อ user_id (snake_case) ไม่ใช่ UserID
-	colName := models.ColReservations // เช่น "reservations"
-	q := client.Collection(colName).
-		Where("user_id", "==", userId).
-		OrderBy("createdAt", firestore.Desc)
-
+	q := client.Collection("users").Doc(userId).Collection("reservations")
 	docs, err := q.Documents(ctx).GetAll()
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
@@ -749,16 +742,13 @@ func GetUserReservations(c *fiber.Ctx) error {
 		})
 	}
 
-	// 3) map เป็น slice ส่งให้ FE
 	out := make([]models.Reservation, 0, len(docs))
 	for _, doc := range docs {
 		var r models.Reservation
 		if err := doc.DataTo(&r); err != nil {
-			// ถ้า map ไม่ได้ให้ log แล้วข้ามไป
 			continue
 		}
 
-		// เผื่อคุณไม่ได้เก็บ ID ลง struct
 		if r.ID == "" {
 			r.ID = doc.Ref.ID
 		}
@@ -769,5 +759,33 @@ func GetUserReservations(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"ok":    true,
 		"items": out,
+	})
+}
+func GetShopNameById(c *fiber.Ctx) error {
+	shopId := c.Params("shopId")
+	if shopId == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "shopId required",
+		})
+	}
+
+	doc, err := config.Client.Collection("shops").Doc(shopId).Get(config.Ctx)
+	if err != nil || !doc.Exists() {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "shop not found",
+		})
+	}
+
+	// อ่าน field 'name'
+	name, err := doc.DataAt("name")
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "name field missing in shop doc",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"shop_id":   shopId,
+		"shop_name": name,
 	})
 }

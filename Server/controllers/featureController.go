@@ -526,27 +526,54 @@ func CreateReservation(c *fiber.Ctx) error {
 func ListReservationsByShop(c *fiber.Ctx) error {
 	shopId := c.Params("id")
 	if shopId == "" {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "shop id required"})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "shop id required",
+		})
 	}
 
-	col := config.Client.Collection(models.ColReservations)
-	q := col.Where("shop_id", "==", shopId).OrderBy("startAt", firestore.Asc)
+	ctx := config.Ctx
+	client := config.Client
 
-	docs, err := q.Documents(config.Ctx).GetAll()
+	q := client.
+		Collection("shops").
+		Doc(shopId).
+		Collection("reservations").
+		OrderBy("createdAt", firestore.Desc) // หรือ "startAt" ถ้า field คุณใช้ชื่อนั้น
+
+	docs, err := q.Documents(ctx).GetAll()
 	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list reservations", "msg": err.Error()})
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list reservations",
+			"msg":   err.Error(),
+		})
 	}
 	if len(docs) == 0 {
-		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "no reservations"})
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "no reservations",
+		})
 	}
 
 	items := make([]models.Reservation, 0, len(docs))
 	for _, d := range docs {
 		var r models.Reservation
-		if err := d.DataTo(&r); err == nil {
-			r.ID = d.Ref.ID
-			items = append(items, r)
+		if err := d.DataTo(&r); err != nil {
+			// map ไม่ได้ก็ข้าม
+			continue
 		}
+
+		// เผื่อ struct ไม่ได้เก็บ ID / ShopID
+		if r.ID == "" {
+			r.ID = d.Ref.ID
+		}
+		if r.ShopID == "" {
+			r.ShopID = shopId
+		}
+
+		items = append(items, r)
 	}
-	return c.JSON(fiber.Map{"reservations": items})
+
+	// 🔁 รูปแบบ response ยังเหมือนเดิม
+	return c.JSON(fiber.Map{
+		"reservations": items,
+	})
 }
