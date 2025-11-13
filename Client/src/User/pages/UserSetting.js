@@ -79,10 +79,10 @@ export default function UserSettingScreen({navigation}) {
     return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
   };  
   return (
-    <View style={[Layout.container]}>
+    <View style={[Layout.container ,{backgroundColor:c.fullwhite}]}>
       <ScrollView>
-        <View style={{ flex: 1, padding: 20, gap:10 }}>
-          <Text style={{ fontSize: 20, fontWeight: "bold", marginTop: 15 }}>{m.Setting()}</Text>
+        <View style={{ flex: 1, padding: 20 ,gap:10 }}>
+          <Text style={{ fontSize: 23, fontWeight: "bold",marginLeft:10, marginTop:10, }}>{m.Setting()}</Text>
           <View style={{gap:10, padding:20,backgroundColor:c.white ,borderRadius:20,shadowRadius:20,shadowColor:c.black,shadowOpacity: 0.06 ,shadowOffset:{ width: 3, height: 40 },elevation: 7}}>
             <Image source={{uri:Profile.avatar||""}}  width={200} height={200} style={{alignSelf:'center',backgroundColor:c.whitegary, borderRadius:200}} >
               
